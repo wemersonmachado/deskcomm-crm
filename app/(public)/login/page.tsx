@@ -46,7 +46,7 @@ export default async function LoginPage({
           className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
           role="alert"
         >
-          {t("Link inválido ou expirado. Peça um novo em Recuperar senha ou refaça o cadastro.")}
+          {t("Link inválido ou expirado. Peça um novo em Recuperar senha ou solicite outro convite.")}
         </div>
       )}
       {/*
@@ -97,13 +97,7 @@ export default async function LoginPage({
           </Link>
         </p>
         <p className="text-muted-foreground">
-          {t("Não tem conta?")}{" "}
-          <Link
-            href="/signup"
-            className="font-medium text-foreground underline underline-offset-4"
-          >
-            {t("Criar conta")}
-          </Link>
+          {t("O primeiro acesso é liberado somente pelo link de convite enviado pelo administrador.")}
         </p>
       </div>
     </div>

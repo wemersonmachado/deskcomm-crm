@@ -1,8 +1,8 @@
 /**
  * O LINK DO E-MAIL DE AUTH É MONTADO POR DOIS ARQUIVOS QUE NÃO SE CONHECEM.
  *
- * Quem inicia a query é o Server Action (`?type=recovery` / `?type=signup` em
- * `redirectTo`/`emailRedirectTo`); quem a continua é o template HTML que o
+ * Quem inicia a query é o Server Action (`?type=recovery` em `redirectTo`);
+ * quem a continua é o template HTML que o
  * GoTrue renderiza (`&token_hash={{ .TokenHash }}`). Um é TypeScript, o outro
  * é HTML lido por um serviço em Go — nenhum compilador, tipo ou teste de
  * unidade existente liga os dois.
@@ -45,11 +45,6 @@ const PARES = [
     fluxo: "recovery",
     action: "app/actions/auth/requestPasswordReset.ts",
     template: "supabase/templates/recovery.html",
-  },
-  {
-    fluxo: "signup",
-    action: "app/actions/auth/signUp.ts",
-    template: "supabase/templates/confirmation.html",
   },
 ] as const;
 

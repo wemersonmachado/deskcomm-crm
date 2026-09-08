@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Sobe os e-mails de ACESSO (criar conta e recuperar senha) com a marca da
-# instalação — assunto, corpo, cor do botão — e configura Site URL / Redirect
-# URLs, que são pré-requisito do link funcionar.
+# Sobe todos os e-mails de autenticação e alertas de segurança com a marca da
+# instalação, configura Site URL / Redirect URLs, desliga cadastro anônimo e,
+# quando há credenciais Resend, configura o SMTP do Supabase Auth.
 #
 #   bash marca-emails.sh                      # lê ../.env e sobe
 #   bash marca-emails.sh --render-em /tmp/x   # só renderiza, não sobe nada
@@ -231,6 +231,16 @@ renderizar() {  # renderizar <arquivo>
 
 HTML_CONFIRM="$(renderizar "$PROJ_DIR/supabase/templates/confirmation.html")" || instrua_e_saia "não achei supabase/templates/ — rode de dentro do repositório."
 HTML_RECOVERY="$(renderizar "$PROJ_DIR/supabase/templates/recovery.html")" || instrua_e_saia "não achei supabase/templates/ — rode de dentro do repositório."
+HTML_INVITE="$(renderizar "$PROJ_DIR/supabase/templates/invite.html")" || instrua_e_saia "modelo invite.html ausente."
+HTML_MAGIC_LINK="$(renderizar "$PROJ_DIR/supabase/templates/magic_link.html")" || instrua_e_saia "modelo magic_link.html ausente."
+HTML_EMAIL_CHANGE="$(renderizar "$PROJ_DIR/supabase/templates/email_change.html")" || instrua_e_saia "modelo email_change.html ausente."
+HTML_REAUTHENTICATION="$(renderizar "$PROJ_DIR/supabase/templates/reauthentication.html")" || instrua_e_saia "modelo reauthentication.html ausente."
+HTML_PASSWORD_CHANGED="$(renderizar "$PROJ_DIR/supabase/templates/password_changed_notification.html")" || instrua_e_saia "modelo password_changed_notification.html ausente."
+HTML_EMAIL_CHANGED="$(renderizar "$PROJ_DIR/supabase/templates/email_changed_notification.html")" || instrua_e_saia "modelo email_changed_notification.html ausente."
+HTML_MFA_ENROLLED="$(renderizar "$PROJ_DIR/supabase/templates/mfa_factor_enrolled_notification.html")" || instrua_e_saia "modelo mfa_factor_enrolled_notification.html ausente."
+HTML_MFA_UNENROLLED="$(renderizar "$PROJ_DIR/supabase/templates/mfa_factor_unenrolled_notification.html")" || instrua_e_saia "modelo mfa_factor_unenrolled_notification.html ausente."
+HTML_IDENTITY_LINKED="$(renderizar "$PROJ_DIR/supabase/templates/identity_linked_notification.html")" || instrua_e_saia "modelo identity_linked_notification.html ausente."
+HTML_IDENTITY_UNLINKED="$(renderizar "$PROJ_DIR/supabase/templates/identity_unlinked_notification.html")" || instrua_e_saia "modelo identity_unlinked_notification.html ausente."
 
 if [ -n "$RENDER_EM" ]; then
   # O caminho de quem roda GoTrue self-hosted: lá não existe Management API, e
@@ -239,6 +249,16 @@ if [ -n "$RENDER_EM" ]; then
   mkdir -p "$RENDER_EM" || instrua_e_saia "não consegui escrever em $RENDER_EM"
   printf '%s\n' "$HTML_CONFIRM"  > "$RENDER_EM/confirmation.html"
   printf '%s\n' "$HTML_RECOVERY" > "$RENDER_EM/recovery.html"
+  printf '%s\n' "$HTML_INVITE" > "$RENDER_EM/invite.html"
+  printf '%s\n' "$HTML_MAGIC_LINK" > "$RENDER_EM/magic_link.html"
+  printf '%s\n' "$HTML_EMAIL_CHANGE" > "$RENDER_EM/email_change.html"
+  printf '%s\n' "$HTML_REAUTHENTICATION" > "$RENDER_EM/reauthentication.html"
+  printf '%s\n' "$HTML_PASSWORD_CHANGED" > "$RENDER_EM/password_changed_notification.html"
+  printf '%s\n' "$HTML_EMAIL_CHANGED" > "$RENDER_EM/email_changed_notification.html"
+  printf '%s\n' "$HTML_MFA_ENROLLED" > "$RENDER_EM/mfa_factor_enrolled_notification.html"
+  printf '%s\n' "$HTML_MFA_UNENROLLED" > "$RENDER_EM/mfa_factor_unenrolled_notification.html"
+  printf '%s\n' "$HTML_IDENTITY_LINKED" > "$RENDER_EM/identity_linked_notification.html"
+  printf '%s\n' "$HTML_IDENTITY_UNLINKED" > "$RENDER_EM/identity_unlinked_notification.html"
   c_grn "✓ modelos renderizados em $RENDER_EM (marca: $APP_NOME, accent: $ACCENT)"
   c_dim "  GoTrue self-hosted: aponte GOTRUE_MAILER_TEMPLATES_CONFIRMATION/RECOVERY para eles."
   exit 0
@@ -278,6 +298,7 @@ api() {  # api <método> <caminho> [corpo]
 # ALCANÇÁVEL: campo ausente faria o grep sair 1 e, com pipefail, derrubaria a
 # atribuição antes da linha que explica o problema.
 json_str() { grep -o "\"$2\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" <<<"$1" | head -1 | sed 's/.*"\([^"]*\)"$/\1/' || true; }
+json_bool() { grep -o "\"$2\"[[:space:]]*:[[:space:]]*\(true\|false\)" <<<"$1" | head -1 | sed 's/.*:[[:space:]]*//' || true; }
 
 # Escapa uma string para dentro de um JSON. Não escapa acento nem `&`: JSON
 # aceita UTF-8 cru, e o que precisa sair são barra, aspas, tab e quebra de linha.
@@ -326,13 +347,72 @@ if [ -n "$APP_URL" ]; then
 fi
 
 # ── 5. Sobe ────────────────────────────────────────────────────────────────
-corpo="{
-  \"mailer_subjects_confirmation\": \"$(json_escape "Confirme seu e-mail — $APP_NOME")\",
-  \"mailer_subjects_recovery\": \"$(json_escape "Redefinir senha — $APP_NOME")\",
-  \"mailer_templates_confirmation_content\": \"$(json_escape "$HTML_CONFIRM")\",
-  \"mailer_templates_recovery_content\": \"$(json_escape "$HTML_RECOVERY")\",
+# Primeiro persiste o limite de segurança sem misturá-lo aos templates. Em
+# projetos gratuitos, a API recusa alteração de template enquanto o SMTP
+# próprio não existe; se tudo viajasse no mesmo PATCH, essa recusa também
+# manteria o cadastro anônimo aberto.
+corpo_seguranca="{
+  \"disable_signup\": true,
   \"site_url\": \"$(json_escape "$SITE_NOVO")\",
   \"uri_allow_list\": \"$(json_escape "$ALLOW_NOVO")\"
+}"
+resposta_seguranca="$(api PATCH "/projects/$REF/config/auth" "$corpo_seguranca")"
+depois_seguranca="$(api GET "/projects/$REF/config/auth")"
+if [ "$(json_bool "$depois_seguranca" disable_signup)" != true ]; then
+  motivo_seguranca="$(json_str "$resposta_seguranca" message)"
+  instrua_e_saia "não consegui desativar o cadastro anônimo${motivo_seguranca:+ — $motivo_seguranca}."
+fi
+
+SMTP_JSON=""
+if [ -n "${RESEND_API_KEY:-}" ] && [ -n "${RESEND_FROM_EMAIL:-}" ]; then
+  SMTP_JSON=",
+  \"external_email_enabled\": true,
+  \"smtp_admin_email\": \"$(json_escape "$RESEND_FROM_EMAIL")\",
+  \"smtp_host\": \"smtp.resend.com\",
+  \"smtp_port\": \"587\",
+  \"smtp_user\": \"resend\",
+  \"smtp_pass\": \"$(json_escape "$RESEND_API_KEY")\",
+  \"smtp_sender_name\": \"$(json_escape "$APP_NOME")\""
+else
+  c_ylw "  • SMTP do Supabase não alterado: RESEND_API_KEY ou RESEND_FROM_EMAIL ausente"
+fi
+
+corpo="{
+  \"disable_signup\": true,
+  \"mailer_autoconfirm\": false,
+  \"mailer_secure_email_change_enabled\": true,
+  \"mailer_subjects_confirmation\": \"$(json_escape "Confirme seu e-mail — $APP_NOME")\",
+  \"mailer_subjects_recovery\": \"$(json_escape "Redefinir senha — $APP_NOME")\",
+  \"mailer_subjects_invite\": \"$(json_escape "Seu acesso foi liberado — $APP_NOME")\",
+  \"mailer_subjects_magic_link\": \"$(json_escape "Seu link de acesso — $APP_NOME")\",
+  \"mailer_subjects_email_change\": \"$(json_escape "Confirme seu novo e-mail — $APP_NOME")\",
+  \"mailer_subjects_reauthentication\": \"$(json_escape "{{ .Token }} é seu código de verificação")\",
+  \"mailer_templates_confirmation_content\": \"$(json_escape "$HTML_CONFIRM")\",
+  \"mailer_templates_recovery_content\": \"$(json_escape "$HTML_RECOVERY")\",
+  \"mailer_templates_invite_content\": \"$(json_escape "$HTML_INVITE")\",
+  \"mailer_templates_magic_link_content\": \"$(json_escape "$HTML_MAGIC_LINK")\",
+  \"mailer_templates_email_change_content\": \"$(json_escape "$HTML_EMAIL_CHANGE")\",
+  \"mailer_templates_reauthentication_content\": \"$(json_escape "$HTML_REAUTHENTICATION")\",
+  \"mailer_notifications_password_changed_enabled\": true,
+  \"mailer_subjects_password_changed_notification\": \"$(json_escape "Sua senha foi alterada — $APP_NOME")\",
+  \"mailer_templates_password_changed_notification_content\": \"$(json_escape "$HTML_PASSWORD_CHANGED")\",
+  \"mailer_notifications_email_changed_enabled\": true,
+  \"mailer_subjects_email_changed_notification\": \"$(json_escape "Seu e-mail foi alterado — $APP_NOME")\",
+  \"mailer_templates_email_changed_notification_content\": \"$(json_escape "$HTML_EMAIL_CHANGED")\",
+  \"mailer_notifications_mfa_factor_enrolled_enabled\": true,
+  \"mailer_subjects_mfa_factor_enrolled_notification\": \"$(json_escape "Nova verificação adicionada — $APP_NOME")\",
+  \"mailer_templates_mfa_factor_enrolled_notification_content\": \"$(json_escape "$HTML_MFA_ENROLLED")\",
+  \"mailer_notifications_mfa_factor_unenrolled_enabled\": true,
+  \"mailer_subjects_mfa_factor_unenrolled_notification\": \"$(json_escape "Verificação removida — $APP_NOME")\",
+  \"mailer_templates_mfa_factor_unenrolled_notification_content\": \"$(json_escape "$HTML_MFA_UNENROLLED")\",
+  \"mailer_notifications_identity_linked_enabled\": true,
+  \"mailer_subjects_identity_linked_notification\": \"$(json_escape "Novo método de acesso vinculado — $APP_NOME")\",
+  \"mailer_templates_identity_linked_notification_content\": \"$(json_escape "$HTML_IDENTITY_LINKED")\",
+  \"mailer_notifications_identity_unlinked_enabled\": true,
+  \"mailer_subjects_identity_unlinked_notification\": \"$(json_escape "Método de acesso removido — $APP_NOME")\",
+  \"mailer_templates_identity_unlinked_notification_content\": \"$(json_escape "$HTML_IDENTITY_UNLINKED")\",
+  \"site_url\": \"$(json_escape "$SITE_NOVO")\",
+  \"uri_allow_list\": \"$(json_escape "$ALLOW_NOVO")\"$SMTP_JSON
 }"
 
 resposta="$(api PATCH "/projects/$REF/config/auth" "$corpo")"
@@ -344,10 +424,27 @@ resposta="$(api PATCH "/projects/$REF/config/auth" "$corpo")"
 # do curl reportaria sucesso. E o modo de falha pior é o oposto — API que
 # ACEITA e IGNORA — que nenhum código de status denuncia.
 depois="$(api GET "/projects/$REF/config/auth")"
-if grep -qF "$MARCADOR" <<<"$depois"; then
+MARCADORES_DEPOIS="$(grep -oF "$MARCADOR" <<<"$depois" | wc -l | tr -d '[:space:]' || true)"
+CADASTRO_DEPOIS="$(json_bool "$depois" disable_signup)"
+SMTP_DEPOIS="$(json_str "$depois" smtp_host)"
+
+# Cada corpo recebe o marcador. Contar os 12 impede que a confirmação suba e
+# os outros onze modelos sejam silenciosamente ignorados pela API. O cadastro
+# fechado e o SMTP são estados independentes e também precisam ser relidos.
+CONFIG_CONFERIDA=true
+[ "${MARCADORES_DEPOIS:-0}" -ge 12 ] || CONFIG_CONFERIDA=false
+[ "$CADASTRO_DEPOIS" = true ] || CONFIG_CONFERIDA=false
+if [ -n "$SMTP_JSON" ] && [ "$SMTP_DEPOIS" != "smtp.resend.com" ]; then
+  CONFIG_CONFERIDA=false
+fi
+
+if [ "$CONFIG_CONFERIDA" = true ]; then
   c_grn "✓ e-mails de acesso configurados e CONFERIDOS (reli o que gravei)"
   c_dim "    assunto:  Confirme seu e-mail — $APP_NOME"
   c_dim "    botão:    $ACCENT sobre texto $ACCENT_FG"
+  if [ -n "$SMTP_JSON" ]; then
+    c_dim "    SMTP:     Resend configurado (credencial não exibida)"
+  fi
   [ "$SITE_NOVO" = "$SITE_ATUAL" ] || c_dim "    site url: $SITE_NOVO"
   [ "$ALLOW_NOVO" = "$ALLOW_ATUAL" ] || c_dim "    redirect: $ALLOW_NOVO"
 
@@ -376,6 +473,7 @@ fi
 
 motivo="$(json_str "$resposta" message)"
 [ -n "$motivo" ] || motivo="$(json_str "$depois" message)"
-instrua_e_saia "os e-mails de acesso NÃO foram configurados${motivo:+ — $motivo}.
-    Reli a configuração depois de gravar e o conteúdo que mandei não estava lá.
+instrua_e_saia "os e-mails de acesso NÃO foram configurados por completo${motivo:+ — $motivo}.
+    Reli a configuração depois de gravar: modelos=${MARCADORES_DEPOIS:-0}/12,
+    cadastro_fechado=${CADASTRO_DEPOIS:-ausente}, smtp=${SMTP_DEPOIS:-ausente}.
     A instalação continua funcionando; só os e-mails ficam no modelo padrão."

@@ -102,7 +102,8 @@ test("suporte mantém identidade, opera B e encerra sem misturar A; readonly/exp
  try{
   const contacts:string[]=[];const convs:string[]=[];const channels:string[]=[];
   for(const label of ["A","B"]){
-   const org=await insert("organizations",{slug:`support-${label.toLowerCase()}-${suffix}`,display_name:`Suporte ${label} ${suffix}`,legal_name:`Suporte ${label}`,onboarded_at:label === "A" ? new Date().toISOString() : null});orgs.push(org);
+   const org=await insert("organizations",{slug:`support-${label.toLowerCase()}-${suffix}`,display_name:`Suporte ${label} ${suffix}`,legal_name:`Suporte ${label}`,onboarded_at:label === "A" ? new Date().toISOString() : null,
+    settings:label === "B" ? {interface_default:{preset:"simplificada"}} : {}});orgs.push(org);
    const contact=await insert("contacts",{organization_id:org,name:`Contato ${label} ${suffix}`,display_name:`Contato ${label} ${suffix}`,force_human:true});contacts.push(contact);
    const sessionName=`support-${randomUUID()}`;
    remoteSessions.set(sessionName,{name:sessionName,status:"STOPPED",engine:"NOWEB",
@@ -117,6 +118,10 @@ test("suporte mantém identidade, opera B e encerra sem misturar A; readonly/exp
   await expect(sameTab.getByTestId("tenant-switcher")).toContainText(`Suporte A ${suffix}`);
   second=await browser.newContext();observeRequests(second);const other=await second.newPage();observeAuth(other);await login(other,email);await acknowledgeKnownAction(other,"/login");
   await start(page,orgs[1]!);
+  // Sem vínculo físico em B, o acompanhamento usa o padrão visual da própria
+  // organização. O perfil simplificado não eleva nem reduz autorização.
+  await expect(page.getByRole("link",{name:"Agentes",exact:true})).toHaveCount(0);
+  await expect(page.getByRole("link",{name:"Inbox",exact:true})).toBeVisible();
   await expect(sameTab.getByTestId("tenant-switcher")).toContainText(`Suporte B ${suffix}`);
   await expect(sameTab.locator("[data-conversation-id]").getByText(`Contato B ${suffix}`,{exact:true})).toBeVisible();
   await expect(sameTab.locator("[data-conversation-id]").getByText(`Contato A ${suffix}`,{exact:true})).toHaveCount(0);

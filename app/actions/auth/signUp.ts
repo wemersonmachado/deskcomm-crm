@@ -2,68 +2,47 @@
 
 import { headers } from "next/headers";
 
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import {
-  signupSchema,
-  signupComConviteSchema,
-  type SignupInput,
-  type SignupComConviteInput,
-} from "@/lib/auth/schemas";
+import { signupComConviteSchema, type SignupComConviteInput } from "@/lib/auth/schemas";
 import { verifyInviteToken } from "@/lib/auth/invite-token";
 import { audit, hashEmail } from "@/lib/audit";
 import { authRateLimited, AUTH_LIMITS } from "@/lib/auth/rate-limit";
-import { env } from "@/lib/env";
 
 export type SignUpResult =
-  | {
-      ok: true;
-      /**
-       * O provedor de auth JÁ abriu a sessão neste `signUp()` — quer dizer,
-       * "Confirm email" está DESLIGADO nele e não vai existir link nenhum para
-       * clicar. Quem chama precisa saber disto: a tela de "confirme seu e-mail"
-       * é uma instrução impossível de cumprir nesse estado, e a pessoa fica
-       * esperando para sempre um e-mail que nunca sai — autenticada, sem
-       * organização, sem motivo para navegar até a saída que existe.
-       *
-       * Medido em 2026-09-05 na `origin/main` @ `4d50f63f`, com
-       * `GOTRUE_MAILER_AUTOCONFIRM=true`: a tela dizia "Enviamos um link de
-       * confirmação para …", e ao mesmo tempo o cookie `sb-deskcomm-auth`
-       * estava no browser e `user_organizations` do usuário vinha `[]`.
-       *
-       * Achado de @KIRAzinx566, com um cliente real travado nessa tela.
-       */
-      sessao_ativa: boolean;
-    }
+  | { ok: true; sessao_ativa: true }
   | {
       ok: false;
-      error: "validation_error" | "rate_limited" | "signup_failed";
+      error:
+        | "validation_error"
+        | "invite_required"
+        | "account_exists"
+        | "rate_limited"
+        | "signup_failed";
       details?: Record<string, unknown>;
     };
 
 /**
- * Signup self-service: cria o usuário no GoTrue e dispara o e-mail de
- * confirmação. O tenant só é provisionado quando o link é confirmado em
- * /auth/confirm (evita orgs órfãs de cadastros nunca confirmados).
+ * Cria uma conta somente quando há convite HMAC válido para o mesmo e-mail.
  *
- * Anti-enumeração: e-mail já cadastrado recebe a MESMA resposta de sucesso —
- * o GoTrue devolve um usuário ofuscado (identities vazio) sem erro, e nós não
- * diferenciamos. Rate limit de envio de e-mail é do próprio GoTrue.
+ * O cadastro anônimo do GoTrue fica desativado. Por isso a criação usa a Admin
+ * API no servidor, depois de validar o convite, e abre a sessão pelo cliente
+ * normal. A conta nasce confirmada: a posse do convite enviado ao endereço é o
+ * fator de entrada, e exigir um segundo e-mail de confirmação faria dois links
+ * diferentes disputarem o mesmo primeiro acesso.
+ *
+ * Nenhuma organização nasce aqui. O token leva a pessoa ao aceite, que cria
+ * somente o vínculo com a organização já criada pelo platform admin.
  */
 export async function signUp(
-  input: SignupInput | SignupComConviteInput,
-  /**
-   * Token de convite, quando a conta está sendo criada para ACEITAR um convite.
-   * Viaja até `/auth/confirm` pelo `user_metadata` — o mesmo canal que
-   * `org_name` já usa e que o e2e do signup exercita. Ele não dá acesso a nada
-   * sozinho: quem decide é `decidirConviteDoSignup`, comparando a assinatura do
-   * token com o e-mail que o provedor de auth confirmou.
-   */
+  input: SignupComConviteInput,
   inviteToken?: string,
 ): Promise<SignUpResult> {
-  const temConvite = typeof inviteToken === "string" && inviteToken.trim() !== "";
-  const parsed = temConvite
-    ? signupComConviteSchema.safeParse(input)
-    : signupSchema.safeParse(input);
+  if (typeof inviteToken !== "string" || inviteToken.trim() === "") {
+    return { ok: false, error: "invite_required" };
+  }
+
+  const parsed = signupComConviteSchema.safeParse(input);
   if (!parsed.success) {
     return {
       ok: false,
@@ -72,58 +51,60 @@ export async function signUp(
     };
   }
 
+  const payload = verifyInviteToken(inviteToken);
+  if (!payload) {
+    return { ok: false, error: "validation_error", details: { invite: ["convite_invalido"] } };
+  }
+  const email = parsed.data.email.trim().toLowerCase();
+  if (payload.email.trim().toLowerCase() !== email) {
+    return { ok: false, error: "validation_error", details: { invite: ["email_divergente"] } };
+  }
+
   const hdrs = await headers();
-  const origin = hdrs.get("origin") ?? env.NEXT_PUBLIC_APP_URL;
   const requestId = hdrs.get("x-request-id");
   const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
   const userAgent = hdrs.get("user-agent") ?? null;
 
-  // Criar conta é fluxo raro por pessoa: teto baixo por IP evita fábrica de
-  // organizações (cada signup provisiona tenant). Issue #64.
   if (await authRateLimited("signup", null, AUTH_LIMITS.signup)) {
     return { ok: false, error: "rate_limited" };
   }
 
-  // Só vira convite se o token verificar E for para este e-mail. Divergência
-  // aqui não é erro do usuário — é tentativa de entrar em organização alheia
-  // colando um token que chegou para outra pessoa.
-  let convite: string | null = null;
-  if (temConvite && inviteToken) {
-    const payload = verifyInviteToken(inviteToken);
-    if (!payload) {
-      return { ok: false, error: "validation_error", details: { invite: ["convite_invalido"] } };
-    }
-    if (payload.email.trim().toLowerCase() !== parsed.data.email.trim().toLowerCase()) {
-      return { ok: false, error: "validation_error", details: { invite: ["email_divergente"] } };
-    }
-    convite = inviteToken;
-  }
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
+  const admin = createAdminClient();
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email,
     password: parsed.data.password,
-    options: {
-      // Ver comentário equivalente em requestPasswordReset.ts: ?type=signup
-      // sobrevive ao redirect do GoTrue e é o que distingue este fluxo do de
-      // recovery quando a verificação chega via `code` (PKCE), não `token_hash`.
-      emailRedirectTo: `${origin}/auth/confirm?type=signup`,
-      // O convite é revalidado no servidor mesmo tendo sido validado ao montar
-      // a tela: o campo de e-mail do formulário é adulterável no cliente, e a
-      // decisão que importa acontece com o e-mail JÁ confirmado pelo provedor.
-      data: convite
-        ? { invite_token: convite }
-        : { org_name: (parsed.data as SignupInput).org_name },
-    },
+    email_confirm: true,
+    user_metadata: { invite_token: inviteToken },
   });
 
-  if (error) {
-    if (error.status === 429) return { ok: false, error: "rate_limited" };
+  if (createError || !created.user) {
+    const jaExiste =
+      createError?.status === 422 || /already|registered|exists/i.test(createError?.message ?? "");
     await audit({
       action: "auth.signup_failed",
       metadata: {
-        email_hash: hashEmail(parsed.data.email),
-        reason: error.message,
+        email_hash: hashEmail(email),
+        reason: jaExiste ? "account_exists" : (createError?.message ?? "no_user"),
+      },
+      requestId,
+      ip,
+      userAgent,
+    });
+    return { ok: false, error: jaExiste ? "account_exists" : "signup_failed" };
+  }
+
+  const supabase = await createClient();
+  const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
+    email,
+    password: parsed.data.password,
+  });
+  if (sessionError || !sessionData.session) {
+    await audit({
+      action: "auth.signup_failed",
+      actorUserId: created.user.id,
+      metadata: {
+        email_hash: hashEmail(email),
+        reason: sessionError?.message ?? "session_not_created",
       },
       requestId,
       ip,
@@ -134,15 +115,12 @@ export async function signUp(
 
   await audit({
     action: "auth.signup_requested",
-    actorUserId: data.user?.id ?? null,
-    metadata: { email_hash: hashEmail(parsed.data.email) },
+    actorUserId: created.user.id,
+    metadata: { email_hash: hashEmail(email), source: "invite" },
     requestId,
     ip,
     userAgent,
   });
 
-  // `data.session` é o único sinal confiável de que o provedor não vai mandar
-  // e-mail nenhum: ele vem preenchido exatamente quando a confirmação está
-  // desligada (ou já resolvida) e o GoTrue devolveu tokens junto do usuário.
-  return { ok: true, sessao_ativa: data.session !== null };
+  return { ok: true, sessao_ativa: true };
 }

@@ -933,7 +933,7 @@ fi
 
 # (3) VACUIDADE: os modelos no disco precisam TER o placeholder, senão o caso
 #     (4) compararia a ausência de marca com a ausência de marca e passaria.
-for modelo in ../supabase/templates/confirmation.html ../supabase/templates/recovery.html; do
+for modelo in ../supabase/templates/*.html; do
   if grep -q '__APP_NAME__' "$modelo"; then
     printf '  ✓ %s tem __APP_NAME__ para substituir\n' "$(basename "$modelo")"
   else
@@ -2650,8 +2650,7 @@ TMP_SITEURL="$(mktemp -d)"
   # Os modelos moram em ../supabase/templates relativo ao script.
   mkdir -p "$TMP_SITEURL/kit" "$TMP_SITEURL/supabase/templates"
   cp "$KIT_AQUI/marca-emails.sh" "$KIT_AQUI/_common.sh" "$TMP_SITEURL/kit/"
-  cp "$KIT_AQUI/../supabase/templates/confirmation.html" \
-     "$KIT_AQUI/../supabase/templates/recovery.html" "$TMP_SITEURL/supabase/templates/" || exit 1
+  cp "$KIT_AQUI/../supabase/templates/"*.html "$TMP_SITEURL/supabase/templates/" || exit 1
 
   mkdir -p "$TMP_SITEURL/bin"
   cat > "$TMP_SITEURL/bin/curl" <<'STUB'

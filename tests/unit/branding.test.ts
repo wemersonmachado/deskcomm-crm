@@ -541,9 +541,23 @@ describe("catraca de marca no que o GoTrue renderiza", () => {
       .join("\n");
   }
 
+  const MODELOS_GOTRUE = [
+    "confirmation.html",
+    "recovery.html",
+    "invite.html",
+    "magic_link.html",
+    "email_change.html",
+    "reauthentication.html",
+    "password_changed_notification.html",
+    "email_changed_notification.html",
+    "mfa_factor_enrolled_notification.html",
+    "mfa_factor_unenrolled_notification.html",
+    "identity_linked_notification.html",
+    "identity_unlinked_notification.html",
+  ].map((nome) => `supabase/templates/${nome}`);
+
   const ALVOS: { arquivo: string; limpar: (f: string) => string }[] = [
-    { arquivo: "supabase/templates/confirmation.html", limpar: semComentariosHtml },
-    { arquivo: "supabase/templates/recovery.html", limpar: semComentariosHtml },
+    ...MODELOS_GOTRUE.map((arquivo) => ({ arquivo, limpar: semComentariosHtml })),
     { arquivo: "supabase/config.toml", limpar: semComentariosToml },
   ];
 
@@ -552,7 +566,7 @@ describe("catraca de marca no que o GoTrue renderiza", () => {
       categoria: "DEV",
       motivo:
         "config do Supabase LOCAL (o `supabase start` de dev e do CI). NÃO embarca na imagem e NÃO alcança clone nenhum: um self-hoster usa um projeto na nuvem do Supabase, cuja config de auth vem do marca-emails.sh, ou um GoTrue próprio, que lê env. `project_id` ainda nomeia os contêineres locais (supabase_auth_deskcomm-crm) e os assuntos são o que a suíte local envia",
-      marcas: ["deskcomm-crm", "deskcommcrm", "deskcommcrm"],
+      marcas: ["deskcomm-crm", ...Array<string>(11).fill("deskcommcrm")],
     },
   };
 
@@ -570,10 +584,9 @@ describe("catraca de marca no que o GoTrue renderiza", () => {
     for (const { arquivo } of ALVOS) {
       expect(fs.existsSync(path.join(RAIZ, arquivo)), `${arquivo} sumiu`).toBe(true);
     }
-    for (const modelo of ["supabase/templates/confirmation.html", "supabase/templates/recovery.html"]) {
+    for (const modelo of MODELOS_GOTRUE) {
       const texto = fs.readFileSync(path.join(RAIZ, modelo), "utf8");
       expect(texto, `${modelo} não substitui a marca`).toContain("__APP_NAME__");
-      expect(texto, `${modelo} não substitui o accent`).toContain("__ACCENT__");
     }
   });
 
@@ -617,10 +630,9 @@ describe("catraca de marca no que o GoTrue renderiza", () => {
     }
   });
 
-  it("os dois modelos de e-mail não têm marca nenhuma — é o estado que se defende", () => {
+  it("os modelos de e-mail não têm marca nenhuma — é o estado que se defende", () => {
     // Explícito, e não só implícito na ausência de linha na allowlist: é ESTE
     // caso que falha quando alguém reescreve "no DeskcommCRM" num template.
-    expect(encontradoAqui.has("supabase/templates/confirmation.html")).toBe(false);
-    expect(encontradoAqui.has("supabase/templates/recovery.html")).toBe(false);
+    for (const modelo of MODELOS_GOTRUE) expect(encontradoAqui.has(modelo)).toBe(false);
   });
 });

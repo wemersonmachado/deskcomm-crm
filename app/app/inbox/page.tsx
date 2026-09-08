@@ -24,12 +24,12 @@ export default async function InboxPage({
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground">
         <p>
           {traduzir(
-            "Você não tem nenhuma organização ativa. Configure sua organização ou aceite um convite.",
+            "Você não tem nenhuma organização ativa. Use o link de convite enviado pelo administrador da plataforma.",
             idioma,
           )}
         </p>
         <Link className="text-primary underline underline-offset-4" href="/get-started">
-          {traduzir("Configurar minha organização", idioma)}
+          {traduzir("Ver instruções de acesso", idioma)}
         </Link>
       </div>
     );

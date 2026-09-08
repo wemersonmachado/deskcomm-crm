@@ -14,6 +14,7 @@ import { verifyInviteToken } from "@/lib/auth/invite-token";
 import { authRateLimited, AUTH_LIMITS } from "@/lib/auth/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { AcceptInviteForm } from "./AcceptInviteForm";
+import { SairParaTrocarConta } from "./SairParaTrocarConta";
 import { normalizarIdioma } from "@/lib/i18n/idiomas";
 import { traduzir } from "@/lib/i18n/dicionario";
 
@@ -79,27 +80,35 @@ export default async function AcceptInvitePage({ params }: PageProps) {
           {t("Para aceitar o convite como")} <strong>{payload.role}</strong>,{" "}
           {t("faça login com o email")} <strong>{payload.email}</strong>.
         </p>
+        {/*
+          "Criar conta" vem primeiro e cheio de propósito: quem é convidado
+          quase sempre está abrindo a PRIMEIRA conta (dono de organização nova
+          é sempre esse caso — a organização não existia até este convite).
+          Antes "Fazer login" vinha primeiro e destacado, e essa pessoa clicava
+          nele por hábito, caía num formulário pedindo uma senha que nunca foi
+          enviada por e-mail (o cadastro é só-por-convite, sem senha
+          provisória — a senha É a que a pessoa escolhe na tela de criar
+          conta) e ficava travada sem entender por quê.
+        */}
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Link
-            href={`/login?next=${next}`}
-            className="inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-          >
-            {t("Fazer login")}
-          </Link>
-          {/*
-            O caminho que faltava. Quem é convidado e ainda NÃO tem conta só
-            tinha "Fazer login" — então criava conta pelo caminho comum, e o
-            provisionamento, sem achar vínculo, abria uma empresa e o tornava
-            admin dela. O token viaja no link para que a conta nova já nasça
-            amarrada a este convite.
-          */}
-          <Link
             href={`/signup?invite=${encodeURIComponent(token)}`}
-            className="text-sm underline underline-offset-4"
+            className="inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
           >
             {t("Ainda não tenho conta")}
           </Link>
+          <Link
+            href={`/login?next=${next}`}
+            className="text-sm underline underline-offset-4"
+          >
+            {t("Fazer login")}
+          </Link>
         </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {t(
+            "Não existe senha enviada por e-mail: você cria a sua ao clicar em \"Ainda não tenho conta\". Use \"Fazer login\" só se já tinha conta antes deste convite.",
+          )}
+        </p>
       </Shell>
     );
   }
@@ -114,14 +123,12 @@ export default async function AcceptInvitePage({ params }: PageProps) {
           {t("mas o convite foi enviado para")} <strong>{payload.email}</strong>.{" "}
           {t("Saia e faça login com o email correto.")}
         </p>
-        <form action="/api/auth/signout" method="post" className="mt-4">
-          <button
-            type="submit"
-            className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
-          >
-            {t("Sair")}
-          </button>
-        </form>
+        <div className="mt-4">
+          <SairParaTrocarConta
+            label={t("Sair e entrar com outro email")}
+            next={`/login?next=${encodeURIComponent(`/team/accept-invite/${token}`)}`}
+          />
+        </div>
       </Shell>
     );
   }

@@ -32,12 +32,14 @@ describe("decidirConviteDoSignup", () => {
     expect(verifyInviteToken(token("alguem@empresa.test"))).not.toBeNull();
   });
 
-  it("sem convite na metadata: caminho normal, ganha a própria organização", () => {
+  it("sem convite na metadata: recusa e nunca cria organização", () => {
     expect(decidirConviteDoSignup({ email: "novo@empresa.test" })).toEqual({
-      tipo: "provisionar",
+      tipo: "recusar",
+      motivo: "convite_ausente",
     });
     expect(decidirConviteDoSignup({ email: "novo@empresa.test", user_metadata: {} })).toEqual({
-      tipo: "provisionar",
+      tipo: "recusar",
+      motivo: "convite_ausente",
     });
   });
 
@@ -97,7 +99,7 @@ describe("decidirConviteDoSignup", () => {
   it("metadata com lixo no lugar do token não vira convite nem quebra", () => {
     for (const lixo of [42, null, {}, [], "   "]) {
       expect(decidirConviteDoSignup({ email: "a@b.test", user_metadata: { invite_token: lixo } })).toEqual(
-        { tipo: "provisionar" },
+        { tipo: "recusar", motivo: "convite_ausente" },
       );
     }
   });

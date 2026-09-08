@@ -56,7 +56,7 @@
       "lane": "db",
       "col": 3,
       "type": "database",
-      "label": "user_organizations.interface_settings"
+      "label": "membership.interface_settings + org.interface_default"
     },
     {
       "id": "context",

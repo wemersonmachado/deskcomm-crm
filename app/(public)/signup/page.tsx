@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { SignupForm } from "@/components/auth/SignupForm";
-import { branding } from "@/lib/branding";
 import { verifyInviteToken } from "@/lib/auth/invite-token";
 import { createClient } from "@/lib/supabase/server";
 import { normalizarIdioma } from "@/lib/i18n/idiomas";
@@ -10,9 +9,9 @@ import { traduzir } from "@/lib/i18n/dicionario";
 export const metadata = { title: "Criar conta" };
 
 /**
- * Aceita `?invite=<token>`: é o caminho de quem foi convidado e ainda não tem
- * conta. Sem isso, essa pessoa criava uma conta comum, e o provisionamento —
- * sem encontrar vínculo nenhum — abria uma organização e a tornava admin dela.
+ * A única entrada é `?invite=<token>`. A página pode continuar pública porque
+ * o token HMAC, o prazo e o e-mail são revalidados pelo Server Action; sem um
+ * convite válido ela não renderiza formulário nem oferece criação de conta.
  *
  * O token só é lido aqui para MONTAR a tela (esconder o nome da empresa, travar
  * o e-mail). Quem decide o que ele vale é o servidor, duas vezes: ao criar a
@@ -26,7 +25,6 @@ export default async function SignupPage({
   const { invite } = await searchParams;
   const payload = invite ? verifyInviteToken(invite) : null;
   const convite = invite && payload ? { token: invite, email: payload.email } : undefined;
-  const conviteExpirado = Boolean(invite) && !payload;
 
   const supabase = await createClient();
   const {
@@ -44,22 +42,22 @@ export default async function SignupPage({
         <p className="text-sm text-muted-foreground">
           {convite
             ? t("Crie sua senha para entrar na empresa que te convidou")
-            : `${t("Comece a usar o")} ${branding().name} ${t("em minutos")}`}
+            : t("O acesso é liberado somente por convite.")}
         </p>
       </div>
 
-      {conviteExpirado && (
+      {!convite && (
         <p
           role="alert"
           className="rounded-md border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm dark:border-amber-500/30 dark:bg-amber-950/20"
         >
-          {t(
-            "Esse convite expirou ou não é mais válido. Peça um novo a quem te convidou — criar uma conta agora abriria uma empresa nova, e não é isso que você quer.",
-          )}
+          {invite
+            ? t("Esse convite expirou ou não é mais válido. Peça um novo a quem administra seu acesso.")
+            : t("Peça ao administrador da plataforma o link de acesso da sua organização.")}
         </p>
       )}
 
-      <SignupForm convite={convite} />
+      {convite && <SignupForm convite={convite} />}
 
       <p className="text-center text-sm text-muted-foreground">
         {t("Já tem conta?")}{" "}

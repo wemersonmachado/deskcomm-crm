@@ -139,6 +139,11 @@ export const AUDIT_ACTIONS = [
   "platform_admin.impersonate_misconfigured",
   "tenant.suspended",
   "tenant.reactivated",
+  // Exclusão DEFINITIVA (cascade em 112 tabelas). A linha desta ação sobrevive
+  // ao que ela registra: `api_audit_log.organization_id` é `on delete set null`,
+  // então o `organization_id` vira NULL e quem responde "qual organização foi
+  // apagada" passa a ser o `metadata` (`tenant_id`, `tenant_slug`).
+  "tenant.deleted",
   "platform_admin.audit_listed",
   "platform_admin.audit_entry_viewed",
   "platform_admin.lgpd_listed",

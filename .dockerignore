@@ -5,6 +5,7 @@ node_modules
 .git
 .env
 .env.*
+CREDENCIAIS-NÃO APAGAR
 test-results
 tests
 playwright.config.ts

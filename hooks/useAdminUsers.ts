@@ -18,6 +18,16 @@ export interface AdminUserRow {
   full_name: string | null;
   last_sign_in_at: string | null;
   created_at: string;
+  /**
+   * `true` quando este usuário está em `platform_admins` (revoked_at IS NULL).
+   *
+   * É um atributo da PESSOA, não do vínculo com o tenant desta linha — role
+   * `admin` aqui é "dono desta empresa"; `is_platform_admin` é "enxerga TODAS
+   * as empresas da instalação". As duas colunas são independentes de propósito
+   * (ver `lib/auth/server.ts`): confundi-las foi o que fez o dono da instalação
+   * não achar o próprio super-admin nesta tela.
+   */
+  is_platform_admin: boolean;
 }
 
 export interface AdminUsersFilters {

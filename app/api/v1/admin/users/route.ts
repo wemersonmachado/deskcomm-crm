@@ -134,6 +134,27 @@ export async function GET(req: NextRequest) {
   // Step 2: get unique user IDs
   const userIds = [...new Set((uoRows as unknown as UoRow[]).map((r) => r.user_id))];
 
+  // Step 2b: quem desta lista é platform admin ATIVO.
+  //
+  // Sem isto, esta tela não distingue "dono desta empresa" (role=admin, escopo
+  // de UM tenant) de "super-admin da instalação inteira" (platform_admins,
+  // atravessa RLS de TODOS os tenants) — foram apresentados como a MESMA coisa
+  // e o próprio dono da instalação não conseguiu achar seu super-admin aqui.
+  // `.in()` é seguro contra lista vazia (o array vem de um Set não-vazio, já
+  // garantido pelo early-return de `uoRows` acima).
+  const { data: paRows, error: paError } = await admin
+    .from("platform_admins")
+    .select("user_id")
+    .in("user_id", userIds)
+    .is("revoked_at", null);
+  if (paError) {
+    return fail("internal_error", "Query failed", 500, {
+      requestId,
+      details: paError.message,
+    });
+  }
+  const platformAdminIds = new Set((paRows ?? []).map((r) => r.user_id as string));
+
   // Step 3: fetch auth users via the Auth Admin API.
   //
   // Varredura paginada do diretório, NÃO um `getUserById` por vínculo. O
@@ -252,6 +273,7 @@ export async function GET(req: NextRequest) {
     full_name: string | null;
     last_sign_in_at: string | null;
     created_at: string;
+    is_platform_admin: boolean;
   };
 
   let joined: JoinedRow[] = (uoRows as unknown as UoRow[]).flatMap((uo) => {
@@ -276,6 +298,7 @@ export async function GET(req: NextRequest) {
           (u.raw_user_meta_data?.full_name as string | undefined) ?? null,
         last_sign_in_at: u.last_sign_in_at,
         created_at: u.created_at,
+        is_platform_admin: platformAdminIds.has(uo.user_id),
       },
     ];
   });

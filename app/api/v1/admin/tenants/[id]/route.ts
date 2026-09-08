@@ -1,4 +1,5 @@
 import { type NextRequest } from "next/server";
+import { z } from "zod";
 import { requirePlatformAdmin } from "@/lib/auth/requirePlatformAdmin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api/wrappers";
@@ -157,4 +158,150 @@ export async function GET(
   });
 
   return ok({ organization: org, counts, integrations }, { requestId });
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /api/v1/admin/tenants/[id] — exclusão DEFINITIVA de um tenant
+// ---------------------------------------------------------------------------
+/**
+ * Apaga a organização e, por `on delete cascade`, TUDO que pertence a ela:
+ * 112 tabelas, entre elas `contacts`, `conversations`, `messages`, `crm_leads`,
+ * `channel_sessions` e `user_organizations`. Não há lixeira e não há desfazer.
+ *
+ * ## Por que existe
+ *
+ * Antes disto, o ciclo de vida de um tenant terminava em `suspended` e a linha
+ * ficava no banco para sempre. Quem administra a instalação não tinha como
+ * remover um tenant de teste, um cliente que saiu, ou uma organização criada por
+ * engano — e o painel não dizia que não tinha: a pessoa procurava o botão, não
+ * achava, e concluía que tinha procurado errado.
+ *
+ * ## As duas travas, e por que são duas
+ *
+ * 1. **A organização precisa estar SUSPENSA.** Excluir é o segundo passo de um
+ *    ciclo de dois — suspender é reversível e visível para o cliente, excluir
+ *    não é nenhum dos dois. A trava também garante que ninguém apaga um tenant
+ *    que está atendendo: para chegar aqui, o atendimento já parou.
+ * 2. **O `slug` tem de ser digitado.** `confirm_slug` precisa bater exatamente
+ *    com o da organização. Um clique errado numa lista não apaga nada; só apaga
+ *    quem escreveu o nome do que está apagando.
+ *
+ * As duas juntas cobrem os dois erros diferentes: a trava 1 pega "eu não sabia
+ * que isso apagava de verdade", a trava 2 pega "eu cliquei na linha errada".
+ *
+ * ## A auditoria SOBREVIVE — e isso é do schema
+ *
+ * `api_audit_log.organization_id` é `ON DELETE SET NULL` (não cascade), então a
+ * linha desta exclusão continua existindo depois que a organização deixa de
+ * existir. É por isso que `metadata` carrega `tenant_id` e `tenant_slug`
+ * DUPLICADOS: quando o FK vira `NULL`, o metadata é a única coisa que ainda
+ * responde QUAL organização foi apagada. Sem essa duplicação a exclusão viraria
+ * uma linha de auditoria que não diz o que apagou.
+ *
+ * A auditoria é gravada **antes** do `delete`, e com `await` em vez do
+ * `fire-and-forget` do resto do arquivo: se a auditoria falhar, a exclusão não
+ * acontece. Aqui a ordem inversa (apagar e depois tentar registrar) deixaria o
+ * pior desfecho possível — dado destruído sem rastro de quem o destruiu.
+ */
+const deleteBodySchema = z.object({
+  confirm_slug: z.string().min(1, "Confirmação obrigatória"),
+});
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const requestId = randomUUID();
+  const { id } = await params;
+
+  let adminCtx: Awaited<ReturnType<typeof requirePlatformAdmin>>;
+  try {
+    adminCtx = await requirePlatformAdmin();
+  } catch {
+    return fail("forbidden", "Platform admin required", 403, { requestId });
+  }
+
+  let body: z.infer<typeof deleteBodySchema>;
+  try {
+    body = deleteBodySchema.parse(await req.json());
+  } catch {
+    return fail("validation_failed", "Invalid request body", 400, { requestId });
+  }
+
+  const admin = createAdminClient();
+
+  const { data: org, error: orgError } = await admin
+    .from("organizations")
+    .select("id, slug, display_name, status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (orgError || !org) {
+    return fail("not_found", "Tenant not found", 404, { requestId });
+  }
+
+  if (org.status !== "suspended") {
+    return fail(
+      "state_conflict",
+      "Suspenda a organização antes de excluí-la. Excluir é definitivo e não tem desfazer.",
+      409,
+      { requestId },
+    );
+  }
+
+  if (body.confirm_slug !== org.slug) {
+    return fail(
+      "validation_failed",
+      "A confirmação não bate com o identificador da organização.",
+      400,
+      { requestId },
+    );
+  }
+
+  // Contagem ANTES de apagar — depois do `delete` não há a quem perguntar, e
+  // "quantas conversas foram destruídas" é a pergunta que alguém vai fazer.
+  const [usersRes, conversationsRes, messagesRes, contactsRes, leadsRes] =
+    await Promise.all([
+      admin.from("user_organizations").select("*", { count: "exact", head: true }).eq("organization_id", id),
+      admin.from("conversations").select("*", { count: "exact", head: true }).eq("organization_id", id),
+      admin.from("messages").select("*", { count: "exact", head: true }).eq("organization_id", id),
+      admin.from("contacts").select("*", { count: "exact", head: true }).eq("organization_id", id),
+      admin.from("crm_leads").select("*", { count: "exact", head: true }).eq("organization_id", id),
+    ]);
+
+  const destruido = {
+    users: usersRes.count ?? 0,
+    conversations: conversationsRes.count ?? 0,
+    messages: messagesRes.count ?? 0,
+    contacts: contactsRes.count ?? 0,
+    leads: leadsRes.count ?? 0,
+  };
+
+  // `await`, e não fire-and-forget: sem rastro, não se apaga.
+  await audit({
+    action: "tenant.deleted",
+    actorUserId: adminCtx.user.id,
+    actingAsPlatformAdmin: true,
+    bypassedRls: true,
+    organizationId: id,
+    resourceType: "organization",
+    resourceId: id,
+    requestId,
+    metadata: {
+      // Duplicados de propósito: o FK vira NULL quando a organização some.
+      tenant_id: id,
+      tenant_slug: org.slug,
+      tenant_display_name: org.display_name,
+      suspended_before_delete: true,
+      destruido,
+    },
+  });
+
+  const { error: deleteError } = await admin.from("organizations").delete().eq("id", id);
+
+  if (deleteError) {
+    return fail("internal_error", "Failed to delete tenant", 500, { requestId });
+  }
+
+  return ok({ id, deleted: true, destruido }, { requestId });
 }

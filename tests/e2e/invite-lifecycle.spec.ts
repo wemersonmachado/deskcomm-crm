@@ -390,8 +390,47 @@ test.describe("ciclo de vida do convite (ponta a ponta + adversarial)", () => {
     // vazio em toda navegação de cliente, então `getByRole("alert")` sozinho casa
     // DOIS elementos e o strict mode reprova — sobre uma tela que está correta.
     await expect(page.getByRole("alert").first()).toContainText(/expirou|não é mais válido/i);
-    // E cai no signup COMUM só depois do aviso — nunca em silêncio.
-    await expect(page.getByLabel("Nome da empresa")).toBeVisible();
+    // E não degrada para signup comum: convite inválido não abre formulário.
+    await expect(page.getByLabel("Nome da empresa")).toHaveCount(0);
+    await expect(page.getByLabel("Email")).toHaveCount(0);
+  });
+
+  test("13. conta nova nasce pelo convite e entra somente na organização convidada", async ({ browser }) => {
+    const novoEmail = `convite-novo-${randomUUID().slice(0, 8)}@deskcomm.test`;
+    const senha = "SenhaForte!2026";
+
+    const adminCtx = await browser.newContext();
+    const adminPage = await adminCtx.newPage();
+    await loginAdminTotp(adminPage);
+    const { acceptUrl, failed } = await issueInvite(adminPage, novoEmail, "agent");
+    expect(failed).toEqual([]);
+    await adminCtx.close();
+
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto(tokenPath(acceptUrl));
+    await page.getByRole("link", { name: /ainda não tenho conta/i }).click();
+    await expect(page.getByLabel("Email")).toHaveValue(novoEmail);
+    await page.getByLabel("Senha", { exact: true }).fill(senha);
+    await page.getByLabel("Confirmar senha").fill(senha);
+    await page.getByRole("button", { name: /criar conta/i }).click();
+    await page.waitForURL(/\/team\/accept-invite\//);
+    await page.getByRole("button", { name: /aceitar convite/i }).click();
+    await page.waitForURL(/\/app\/inbox/);
+
+    const { data: users } = await svc.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const criado = users.users.find((u) => u.email === novoEmail);
+    expect(criado).toBeTruthy();
+    if (criado) {
+      const { data: memberships } = await svc
+        .from("user_organizations")
+        .select("organization_id, role")
+        .eq("user_id", criado.id)
+        .is("revoked_at", null);
+      expect(memberships).toEqual([{ organization_id: inv.org_id, role: "agent" }]);
+      await svc.auth.admin.deleteUser(criado.id);
+    }
+    await ctx.close();
   });
 });
 

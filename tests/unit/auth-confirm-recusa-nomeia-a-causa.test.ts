@@ -32,7 +32,6 @@ import { createClient } from "@/lib/supabase/server";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn(async () => undefined) }));
-vi.mock("@/lib/auth/provision", () => ({ ensureTenantForUser: vi.fn(async () => undefined) }));
 vi.mock("@/lib/env", () => ({ env: { NEXT_PUBLIC_APP_URL: "https://crm.exemplo.com.br" } }));
 
 import { GET } from "@/app/auth/confirm/route";

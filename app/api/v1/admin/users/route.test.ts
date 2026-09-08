@@ -97,13 +97,18 @@ function makeAdminStub(cfg: Cfg) {
     },
   };
 
+  const platformAdminBuilder = {
+    select: () => platformAdminBuilder,
+    in: () => platformAdminBuilder,
+    is: () => Promise.resolve({ data: [], error: null }),
+  };
+
   return {
     stub: {
       from: (table: string) => {
-        if (table !== "user_organizations") {
-          throw new Error(`unexpected table ${table}`);
-        }
-        return builder;
+        if (table === "user_organizations") return builder;
+        if (table === "platform_admins") return platformAdminBuilder;
+        throw new Error(`unexpected table ${table}`);
       },
       auth: { admin: { listUsers, getUserById } },
     },

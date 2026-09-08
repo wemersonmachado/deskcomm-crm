@@ -30,10 +30,22 @@ export function TenantSwitcher() {
       if (!result.ok) throw new Error(result.error);
       // Novo documento elimina QueryClient, subscriptions e respostas em voo.
       window.location.assign("/app/inbox");
-    } catch {
+    } catch (err) {
       transition.cancel();
       setPending(false);
-      toast.error(t("Não foi possível trocar de organização. Seu acesso pode ter mudado. Tente novamente."));
+      // Mensagem por CAUSA, não uma frase genérica pra tudo. A antiga ("seu
+      // acesso pode ter mudado") é assustadora e, pro caso mais comum — a
+      // própria pessoa suspendeu a organização e tentou entrar nela de novo —,
+      // é simplesmente falsa: nada mudou no acesso dela, a organização é que
+      // está suspensa. Ver o porquê em `app/actions/shell/setActiveOrg.ts`.
+      const codigo = err instanceof Error ? err.message : "";
+      const mensagem =
+        codigo === "organization_suspended"
+          ? t("Esta organização está suspensa. Fale com quem administra a instalação para reativá-la.")
+          : codigo === "mfa_required"
+            ? t("Confirme a verificação em duas etapas antes de trocar de organização.")
+            : t("Não foi possível trocar de organização. Tente novamente.");
+      toast.error(mensagem);
     }
   };
 

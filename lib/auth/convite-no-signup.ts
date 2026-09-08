@@ -1,18 +1,14 @@
 /**
- * Quem acabou de confirmar o e-mail: alguém abrindo a própria empresa, ou
- * alguém que foi CONVIDADO para uma que já existe?
+ * Quem acabou de confirmar um e-mail só pode prosseguir se tiver sido
+ * CONVIDADO para uma organização que já existe.
  *
  * O convite não tem linha em tabela nenhuma — é um token HMAC auto-contido. E o
- * aceite exige sessão. Então quem é convidado e ainda não tem conta precisa
- * criar uma, e nesse instante `ensureTenantForUser` não encontra vínculo algum
- * e faz o que faria com qualquer visitante novo: cria uma organização e o torna
- * ADMIN dela. A pessoa termina com uma empresa fantasma, um wizard de
- * onboarding que não é dela e o gate de MFA de administrador — e só depois, se
- * voltar ao link dentro das 24h, entra na empresa certa, ficando nas duas.
+ * aceite exige sessão. O token viaja no metadata apenas para atravessar o
+ * provedor de Auth; antes de qualquer conta ser criada ele também é validado no
+ * Server Action. Aqui ele é revalidado no retorno do provedor.
  *
- * Este módulo é o ponto onde essa bifurcação passa a existir. É uma função
- * PURA de propósito: a propriedade que ela carrega é de segurança, e precisa
- * ser testável sem banco, dentro do gate obrigatório.
+ * É uma função PURA de propósito: a propriedade que ela carrega é de segurança,
+ * e precisa ser testável sem banco, dentro do gate obrigatório.
  *
  * ⚠️ `user_metadata` é gravável pelo próprio usuário (`updateUser({data})` com a
  * anon key, do navegador). Nada que venha de lá é autoridade: quem manda é a
@@ -25,10 +21,11 @@ import { verifyInviteToken, type InvitePayload } from "@/lib/auth/invite-token";
 export type DecisaoDeSignup =
   /** Foi convidado: NÃO provisionar organização; mandar para o aceite. */
   | { tipo: "convite"; token: string; payload: InvitePayload }
-  /** Ninguém o convidou: caminho normal, ganha a própria organização. */
-  | { tipo: "provisionar" }
-  /** Havia convite e ele não vale. Não provisiona — ver abaixo. */
-  | { tipo: "recusar"; motivo: "token_invalido" | "email_divergente" };
+  /** Sem convite ou convite inválido: nunca cria organização. */
+  | {
+      tipo: "recusar";
+      motivo: "convite_ausente" | "token_invalido" | "email_divergente";
+    };
 
 interface UsuarioConfirmado {
   email?: string | null;
@@ -41,8 +38,11 @@ function normalizar(email: string | null | undefined): string {
 
 export function decidirConviteDoSignup(user: UsuarioConfirmado): DecisaoDeSignup {
   const bruto = user.user_metadata?.["invite_token"];
-  // Sem convite em jogo: o caminho de sempre, intocado.
-  if (typeof bruto !== "string" || bruto.trim() === "") return { tipo: "provisionar" };
+  // Sem convite não existe cadastro self-service. Falha fechada também para
+  // links antigos de confirmação que ainda estejam em caixas de entrada.
+  if (typeof bruto !== "string" || bruto.trim() === "") {
+    return { tipo: "recusar", motivo: "convite_ausente" };
+  }
 
   const payload = verifyInviteToken(bruto);
   // FALHA FECHADA. Token expirado ou adulterado NÃO pode cair no provisionamento:

@@ -50,10 +50,10 @@ additional_redirect_urls = [
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
-enable_signup = true # Signup self-service (/signup) — provisiona tenant em /auth/confirm
+enable_signup = false # Contas nascem somente pela Admin API após convite HMAC válido
 
 [auth.email]
-enable_signup = true
+enable_signup = false
 double_confirm_changes = true
 enable_confirmations = true
 
@@ -66,6 +66,52 @@ content_path = "./supabase/templates/confirmation.html"
 [auth.email.template.recovery]
 subject = "Redefinir senha — DeskcommCRM"
 content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.invite]
+subject = "Seu acesso foi liberado — DeskcommCRM"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.magic_link]
+subject = "Seu link de acesso — DeskcommCRM"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.email_change]
+subject = "Confirme seu novo e-mail — DeskcommCRM"
+content_path = "./supabase/templates/email_change.html"
+
+[auth.email.template.reauthentication]
+subject = "{{ .Token }} é seu código de verificação"
+content_path = "./supabase/templates/reauthentication.html"
+
+[auth.email.notification.password_changed]
+enabled = true
+subject = "Sua senha foi alterada — DeskcommCRM"
+content_path = "./supabase/templates/password_changed_notification.html"
+
+[auth.email.notification.email_changed]
+enabled = true
+subject = "Seu e-mail foi alterado — DeskcommCRM"
+content_path = "./supabase/templates/email_changed_notification.html"
+
+[auth.email.notification.mfa_factor_enrolled]
+enabled = true
+subject = "Nova verificação adicionada — DeskcommCRM"
+content_path = "./supabase/templates/mfa_factor_enrolled_notification.html"
+
+[auth.email.notification.mfa_factor_unenrolled]
+enabled = true
+subject = "Verificação removida — DeskcommCRM"
+content_path = "./supabase/templates/mfa_factor_unenrolled_notification.html"
+
+[auth.email.notification.identity_linked]
+enabled = true
+subject = "Novo método de acesso vinculado — DeskcommCRM"
+content_path = "./supabase/templates/identity_linked_notification.html"
+
+[auth.email.notification.identity_unlinked]
+enabled = true
+subject = "Método de acesso removido — DeskcommCRM"
+content_path = "./supabase/templates/identity_unlinked_notification.html"
 
 [auth.mfa]
 max_enrolled_factors = 10

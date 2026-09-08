@@ -54,6 +54,7 @@ export function TenantOverviewClient({ id }: TenantOverviewClientProps) {
           organizationId={organization.id}
           status={organization.status}
           displayName={organization.display_name}
+          slug={organization.slug}
         />
       </div>
     </div>

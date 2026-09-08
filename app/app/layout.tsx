@@ -2,6 +2,7 @@ import { InterfaceRefresh } from "@/hooks/auth/InterfaceRefresh";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { isMfaEnrolled, loadAuthUser, requiresMfa, resolveActiveOrg } from "@/lib/auth/server";
+import { decidirAcessoSuspenso } from "@/lib/auth/suspensao";
 import { DEFAULT_VISIBILITY_MODE, type VisibilityMode } from "@/lib/auth/types";
 import { AuthProvider } from "@/hooks/auth/AuthProvider";
 import { AppShell } from "./_components/AppShell";
@@ -45,7 +46,50 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .eq("id", activeOrg.orgId)
       .maybeSingle();
     if (orgRow && !orgRow.onboarded_at && !user.support) redirect("/onboarding");
-    if (orgRow?.status === "suspended") redirect("/account-suspended");
+    /**
+     * Suspensão NÃO tranca quem tem saída — ver `lib/auth/suspensao.ts` para o
+     * incidente que originou isto (dono da instalação perdeu o produto inteiro
+     * ao suspender o segundo tenant dele).
+     *
+     * A segunda consulta só acontece quando a organização ativa está suspensa:
+     * no caminho normal — todo render de todo tenant saudável — este bloco custa
+     * exatamente o que custava antes, que é nada.
+     *
+     * Acompanhamento de suporte é exceção e continua caindo direto na tela: a
+     * organização dele vem da sessão de impersonate, não do cookie, então
+     * "trocar" não é uma saída que exista aqui.
+     */
+    if (orgRow?.status === "suspended") {
+      if (user.support) redirect("/account-suspended");
+
+      const idsDoUsuario = user.organizations.map((o) => o.organization_id);
+      const { data: statusRows } = await admin
+        .from("organizations")
+        .select("id, status")
+        .in("id", idsDoUsuario);
+
+      // Ordem preservada: `decidirAcessoSuspenso` escolhe a PRIMEIRA saída, e a
+      // ordem que vale é a de `user.organizations` (`accepted_at`, depois id) —
+      // a mesma que decide a organização padrão. O `.in()` do PostgREST não
+      // promete ordem nenhuma, então reordenar aqui não é preciosismo: sem isto,
+      // para quem tem três empresas, a organização de destino mudaria entre uma
+      // recuperação e outra sem nada ter mudado.
+      const porId = new Map((statusRows ?? []).map((r) => [r.id, r.status]));
+      const decisao = decidirAcessoSuspenso(
+        activeOrg.orgId,
+        user.organizations.map((o) => ({
+          organization_id: o.organization_id,
+          status: porId.get(o.organization_id),
+        })),
+        user.is_platform_admin,
+      );
+
+      if (decisao.acao === "trocar") {
+        redirect(`/trocar-organizacao?org=${decisao.orgId}&next=%2Fapp`);
+      }
+      if (decisao.acao === "painel_plataforma") redirect("/admin");
+      if (decisao.acao === "bloquear") redirect("/account-suspended");
+    }
     // G4-02: expõe visibility_mode ao client (inbox decide visões visíveis).
     // Fonte confiável (admin client, org do cookie validado) — nunca do body.
     const mode = (orgRow?.settings as { visibility_mode?: VisibilityMode } | null)

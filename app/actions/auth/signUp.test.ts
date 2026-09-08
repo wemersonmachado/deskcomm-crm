@@ -1,100 +1,92 @@
-/**
- * O CADASTRO PRECISA DIZER QUANDO NÃO VAI EXISTIR E-MAIL PARA CLICAR.
- *
- * ─── O defeito, medido pela tela ────────────────────────────────────────────
- *
- * Provedor de auth com "Confirm email" DESLIGADO faz `signUp()` devolver uma
- * SESSÃO junto do usuário: a pessoa já entrou. Como a action devolvia só
- * `{ ok: true }`, a tela mostrava "Enviamos um link de confirmação para … abra
- * o e-mail e clique no link para ativar sua conta" — uma instrução impossível
- * de cumprir, porque e-mail nenhum foi enviado.
- *
- * Medido na `origin/main` @ `4d50f63f`, com `GOTRUE_MAILER_AUTOCONFIRM=true`,
- * dirigindo a tela: o texto acima aparecia, o cookie de sessão `sb-deskcomm-auth`
- * estava no browser, e `user_organizations` do usuário novo vinha `[]`. A pessoa
- * ficava esperando para sempre, autenticada e sem organização, sem motivo para
- * descobrir que a saída existe. Achado de @KIRAzinx566, com cliente real preso.
- *
- * ─── O que este arquivo guarda ──────────────────────────────────────────────
- *
- * Que `sessao_ativa` reflita a SESSÃO que o provedor devolveu — nos dois
- * sentidos. Guardar só o caso "com sessão" deixaria verde um `sessao_ativa: true`
- * constante, que mandaria para `/get-started` quem de fato precisa confirmar o
- * e-mail: pessoa sem sessão nenhuma, que cairia no `requireAuth()` e voltaria
- * para o login sem nunca ler que um e-mail a espera.
- */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { signInviteToken } from "@/lib/auth/invite-token";
 
 vi.mock("next/headers", () => ({ headers: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 vi.mock("@/lib/audit", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   audit: vi.fn(async () => undefined),
 }));
 
-const signUpDoProvedor = vi.fn();
-
-/** Um e-mail novo por caso: o teto de `signup` é por IP e por janela. */
-let n = 0;
-const entrada = () => ({
-  org_name: "Plata Iphones",
-  email: `cadastro-${++n}-${Date.now()}@exemplo.test`,
+const email = "convidado@empresa.test";
+const input = {
+  email,
   password: "SenhaForte!2026",
   password_confirm: "SenhaForte!2026",
-});
+};
+const token = () =>
+  signInviteToken({
+    invite_id: "11111111-1111-4111-8111-111111111111",
+    email,
+    organization_id: "22222222-2222-4222-8222-222222222222",
+    role: "admin",
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  });
 
-describe("signUp — a tela precisa saber se a sessão já veio aberta", () => {
+const createUser = vi.fn();
+const signInWithPassword = vi.fn();
+
+describe("signUp — somente convite", () => {
   beforeEach(() => {
-    vi.resetModules();
-    signUpDoProvedor.mockReset();
-    vi.mocked(headers).mockResolvedValue({
-      // IP diferente a cada caso, pelo mesmo motivo do e-mail.
-      get: (k: string) => (k === "x-forwarded-for" ? `198.51.100.${n % 250}` : null),
+    vi.clearAllMocks();
+    vi.mocked(headers).mockResolvedValue({ get: () => null } as never);
+    vi.mocked(createAdminClient).mockReturnValue({
+      auth: { admin: { createUser } },
     } as never);
-    vi.mocked(createClient).mockResolvedValue({
-      auth: { signUp: signUpDoProvedor },
-    } as never);
-  });
-
-  it('"Confirm email" DESLIGADO: o provedor devolve sessão → sessao_ativa', async () => {
-    // A forma exata que o GoTrue devolve com MAILER_AUTOCONFIRM=true.
-    signUpDoProvedor.mockResolvedValue({
-      data: { user: { id: "u-1" }, session: { access_token: "tok", refresh_token: "ref" } },
+    vi.mocked(createClient).mockResolvedValue({ auth: { signInWithPassword } } as never);
+    createUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+    signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: "token" } },
       error: null,
     });
-
-    const { signUp } = await import("./signUp");
-    const res = await signUp(entrada());
-
-    expect(res).toEqual({ ok: true, sessao_ativa: true });
   });
 
-  it("CONTROLE — confirmação LIGADA: sem sessão, a tela do e-mail continua certa", async () => {
-    // Sem este caso, `sessao_ativa: true` fixo passaria — e mandaria para a
-    // recuperação quem ainda nem tem sessão.
-    signUpDoProvedor.mockResolvedValue({
-      data: { user: { id: "u-2" }, session: null },
-      error: null,
-    });
-
+  it("recusa antes de tocar o provedor quando não há convite", async () => {
     const { signUp } = await import("./signUp");
-    const res = await signUp(entrada());
-
-    expect(res).toEqual({ ok: true, sessao_ativa: false });
+    await expect(signUp(input)).resolves.toEqual({ ok: false, error: "invite_required" });
+    expect(createUser).not.toHaveBeenCalled();
   });
 
-  it("CONTROLE — o provedor recusar continua sendo erro, não sessão", async () => {
-    signUpDoProvedor.mockResolvedValue({
-      data: { user: null, session: null },
-      error: { message: "signup disabled", status: 422 },
-    });
-
+  it("convite válido cria usuário confirmado no servidor e abre sessão", async () => {
+    const invite = token();
     const { signUp } = await import("./signUp");
-    const res = await signUp(entrada());
+    await expect(signUp(input, invite)).resolves.toEqual({ ok: true, sessao_ativa: true });
+    expect(createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email,
+        email_confirm: true,
+        user_metadata: { invite_token: invite },
+      }),
+    );
+    expect(signInWithPassword).toHaveBeenCalledWith({ email, password: input.password });
+  });
 
-    expect(res).toEqual({ ok: false, error: "signup_failed" });
+  it("token emitido para outro e-mail não cria usuário", async () => {
+    const outro = signInviteToken({
+      invite_id: "11111111-1111-4111-8111-111111111111",
+      email: "outra@empresa.test",
+      organization_id: "22222222-2222-4222-8222-222222222222",
+      role: "admin",
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const { signUp } = await import("./signUp");
+    const result = await signUp(input, outro);
+    expect(result).toMatchObject({ ok: false, error: "validation_error" });
+    expect(createUser).not.toHaveBeenCalled();
+  });
+
+  it("conta existente orienta login e não tenta abrir sessão com a nova senha", async () => {
+    createUser.mockResolvedValue({
+      data: { user: null },
+      error: { status: 422, message: "User already registered" },
+    });
+    const { signUp } = await import("./signUp");
+    await expect(signUp(input, token())).resolves.toEqual({ ok: false, error: "account_exists" });
+    expect(signInWithPassword).not.toHaveBeenCalled();
   });
 });

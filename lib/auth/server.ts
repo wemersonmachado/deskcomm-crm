@@ -269,10 +269,38 @@ export async function loadAuthUser(): Promise<AuthUser | null> {
 export async function resolveActiveOrg(authUser: AuthUser): Promise<ActiveOrg | null> {
   if (authUser.support) {
     if (authUser.support.status !== "active") redirect("/support-ended");
+    const membership = authUser.organizations.find(
+      (item) => item.organization_id === authUser.support!.organization_id,
+    );
+    let interfaceSettings = membership?.interface_settings;
+    if (!interfaceSettings) {
+      // O alvo vem da sessão de suporte validada no banco, nunca do cliente.
+      // A consulta service-role só resolve apresentação; autorização continua
+      // sendo o access_mode da sessão e os guards/RLS de cada operação.
+      const { data, error } = await createAdminClient()
+        .from("organizations")
+        .select("settings")
+        .eq("id", authUser.support.organization_id)
+        .maybeSingle();
+      if (error) {
+        logger.error("[auth] perfil visual da organização indisponível no suporte", {
+          organization_id: authUser.support.organization_id,
+          code: error.code,
+          message: error.message,
+        });
+      }
+      const settings = data?.settings;
+      const rawDefault =
+        settings && typeof settings === "object" && !Array.isArray(settings)
+          ? (settings as Record<string, unknown>).interface_default
+          : undefined;
+      interfaceSettings = lerInterface(rawDefault).settings;
+    }
     return {
       orgId: authUser.support.organization_id,
       name: authUser.support.name,
       role: authUser.support.access_mode === "full" ? "admin" : "viewer",
+      interface_settings: interfaceSettings,
     };
   }
   const store = await cookies();

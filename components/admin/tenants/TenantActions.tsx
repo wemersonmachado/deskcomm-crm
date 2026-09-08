@@ -3,7 +3,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SuspendDialog } from "./SuspendDialog";
 import { ReactivateDialog } from "./ReactivateDialog";
+import { DeleteTenantDialog } from "./DeleteTenantDialog";
 import { ImpersonateButton } from "@/components/admin/ImpersonateButton";
+import { OwnerInviteDialog } from "./OwnerInviteDialog";
 import { useT } from "@/hooks/i18n/useT";
 
 // ---------------------------------------------------------------------------
@@ -14,6 +16,8 @@ interface TenantActionsProps {
   organizationId: string;
   status: "active" | "suspended" | "redacted";
   displayName: string;
+  /** Necessário para a confirmação digitada da exclusão definitiva. */
+  slug: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -24,10 +28,13 @@ export function TenantActions({
   organizationId,
   status,
   displayName,
+  slug,
 }: TenantActionsProps) {
   const t = useT();
   const [suspendOpen, setSuspendOpen] = useState(false);
   const [reactivateOpen, setReactivateOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [ownerInviteOpen, setOwnerInviteOpen] = useState(false);
 
   const canSuspend = status === "active";
   const isSuspended = status === "suspended";
@@ -49,6 +56,12 @@ export function TenantActions({
             isRedacted ? t("Tenant redigido — ação não disponível") : undefined
           }
         />
+
+        {!isRedacted && (
+          <Button className="w-full" variant="outline" onClick={() => setOwnerInviteOpen(true)}>
+            {t("Convidar responsável")}
+          </Button>
+        )}
 
         {/* Suspend */}
         {canSuspend && (
@@ -79,6 +92,29 @@ export function TenantActions({
             {t("Tenant redigido — ações de gestão não disponíveis.")}
           </p>
         )}
+
+        {/*
+          Excluir só aparece para tenant SUSPENSO, e isso é a mesma trava que o
+          servidor aplica (409 se o status não for `suspended`) — não é a tela
+          decidindo sozinha. Esconder o botão num tenant ativo evita a pergunta
+          "por que isto está desabilitado" e força o ciclo de dois passos:
+          suspender (reversível, visível ao cliente) e só então excluir.
+        */}
+        {isSuspended && (
+          <div className="border-t pt-4 space-y-2">
+            <p className="text-xs text-muted-foreground">
+              {t("Excluir apaga a organização e todos os dados dela. Não tem desfazer.")}
+            </p>
+            <Button
+              className="w-full"
+              variant="destructive"
+              onClick={() => setDeleteOpen(true)}
+              aria-label={t("Excluir definitivamente")}
+            >
+              {t("Excluir definitivamente")}
+            </Button>
+          </div>
+        )}
       </div>
 
       <SuspendDialog
@@ -90,6 +126,19 @@ export function TenantActions({
       <ReactivateDialog
         open={reactivateOpen}
         onClose={() => setReactivateOpen(false)}
+        organizationId={organizationId}
+      />
+
+      <DeleteTenantDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        organizationId={organizationId}
+        slug={slug}
+        displayName={displayName}
+      />
+      <OwnerInviteDialog
+        open={ownerInviteOpen}
+        onClose={() => setOwnerInviteOpen(false)}
         organizationId={organizationId}
       />
     </>

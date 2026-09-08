@@ -86,7 +86,7 @@ describe("troca normal exige vínculo ativo mesmo sendo platform admin", () => {
   it("filtra aceito/ativo e audita org alvo com ator autenticado", async () => {
     const chain = membership({ organization_id: org });
     expect((await setActiveOrg(org)).ok).toBe(true);
-    expect(chain.eq).toHaveBeenCalledWith("organizations.status", "active");
+    expect(chain.eq).not.toHaveBeenCalledWith("organizations.status", "active");
     expect(chain.not).toHaveBeenCalledWith("accepted_at", "is", null);
     expect(h.cookie).toHaveBeenCalledWith("active_org", org, expect.objectContaining({ httpOnly: true, sameSite: "strict" }));
     expect(h.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "organization.switched", actorUserId: actor, organizationId: org }));

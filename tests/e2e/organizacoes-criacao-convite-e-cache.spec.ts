@@ -57,6 +57,14 @@ test("org única oferece criação, responsável aceita e A→B→A não mistura
     await page.getByRole("link", { name: /Novo tenant/i }).click();
     await page.getByLabel("Nome de exibição").fill(`Empresa B ${suffix}`);
     await page.getByLabel("E-mail do responsável").fill(guestEmail);
+    // O seletor de plano era um portal Radix nessa tela e falhava de forma
+    // intermitente em navegadores com tradução/extensões. O controle nativo
+    // precisa sobreviver a trocas repetidas e entregar o último valor.
+    const plan = page.getByLabel("Plano");
+    await plan.selectOption("pro");
+    await plan.selectOption("enterprise");
+    await plan.selectOption("standard");
+    await page.getByLabel("Perfil de interface").selectOption("simplificada");
     // O servidor confirma, mas todas as respostas da primeira tentativa se perdem.
     let loseResponse = true;
     const lost: Array<{ id: string; owner_invitation: { accept_url: string } }> = [];
@@ -98,6 +106,23 @@ test("org única oferece criação, responsável aceita e A→B→A não mistura
     const duplicateCheck = await db.from("organizations").select("id").eq("slug", created.slug);
     expect(duplicateCheck.error).toBeNull();
     expect(duplicateCheck.data).toEqual([{ id: orgB }]);
+    const organizationProfile = await db
+      .from("organizations")
+      .select("settings")
+      .eq("id", orgB)
+      .single();
+    expect(organizationProfile.error).toBeNull();
+    expect(organizationProfile.data?.settings).toMatchObject({
+      plan: "standard",
+      interface_default: { preset: "simplificada" },
+    });
+    const creatorProfile = await db
+      .from("user_organizations")
+      .select("interface_settings")
+      .eq("organization_id", orgB)
+      .eq("user_id", users[0])
+      .single();
+    expect(creatorProfile.data?.interface_settings).toEqual({ preset: "simplificada" });
     await expect(page.getByText("Organização criada", { exact: true })).toBeVisible();
     const link = await page.getByLabel("Link do convite").inputValue();
     const tokenBody = new URL(link).pathname.split("/").at(-1)!.split(".")[0]!;
@@ -172,8 +197,9 @@ test("org única oferece criação, responsável aceita e A→B→A não mistura
     await guest.getByRole("button", { name: "Aceitar convite", exact: true }).click();
     await expect(guest.getByTestId("tenant-switcher")).toContainText(`Empresa B ${suffix}`);
     await expect(guest.locator("[data-conversation-id]").getByText(`Cliente B ${suffix}`, { exact: true })).toBeVisible();
-    const membership = await db.from("user_organizations").select("invited_by,role").eq("organization_id", orgB).eq("user_id", users[1]).single();
-    expect(membership.data).toEqual({ invited_by: users[0], role: "admin" });
+    const membership = await db.from("user_organizations").select("invited_by,role,interface_settings").eq("organization_id", orgB).eq("user_id", users[1]).single();
+    expect(membership.data).toEqual({ invited_by: users[0], role: "admin", interface_settings: { preset: "simplificada" } });
+    await expect(guest.getByRole("link", { name: "Agentes", exact: true })).toHaveCount(0);
     await guest.screenshot({ path: ".superpowers/evidence/comunidade-360/aceite-na-org-b.png" });
   } finally {
     await guestContext?.close();

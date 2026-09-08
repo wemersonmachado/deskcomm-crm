@@ -50,6 +50,24 @@ function RoleBadge({ role }: { role: string }) {
   );
 }
 
+/**
+ * A marca que faltava nesta tela — ver `hooks/useAdminUsers.ts` para o
+ * incidente: `RoleBadge` mostra o papel DENTRO do tenant desta linha ("dono
+ * desta empresa"); esta marca mostra o poder ATRAVÉS de todos os tenants
+ * ("super-admin da instalação"). São eixos independentes — uma pessoa pode ser
+ * `viewer` num tenant e platform admin ao mesmo tempo — e por isso é um badge
+ * separado ao lado do e-mail (identifica a PESSOA), não mais uma opção dentro
+ * de `RoleBadge` (que descreve o VÍNCULO com aquela linha).
+ */
+function PlatformAdminBadge() {
+  const t = useT();
+  return (
+    <Badge variant="warning" title={t("Super-admin: acesso a todas as organizações da instalação")}>
+      {t("Plataforma")}
+    </Badge>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -150,7 +168,10 @@ export function UsersTableAdmin({
             {data.map((row) => (
               <TableRow key={`${row.user_id}:${row.organization_id}`}>
                 <TableCell className="font-mono text-xs">
-                  {row.email ?? "—"}
+                  <div className="flex items-center gap-1.5">
+                    <span>{row.email ?? "—"}</span>
+                    {row.is_platform_admin && <PlatformAdminBadge />}
+                  </div>
                 </TableCell>
                 <TableCell className="font-medium">
                   {row.full_name ?? <span className="text-muted-foreground">—</span>}

@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
-import { ensureTenantForUser } from "@/lib/auth/provision";
 import { decidirConviteDoSignup } from "@/lib/auth/convite-no-signup";
 import { audit } from "@/lib/audit";
 import { env } from "@/lib/env";
@@ -48,8 +47,8 @@ import { env } from "@/lib/env";
  *   "link inválido ou expirado" manda o operador caçar TTL e relógio quando o
  *   problema é que os templates nunca foram configurados.
  *
- * - type=signup  → provisiona o tenant (org + membership admin) e entra no
- *                  onboarding. Provisionamento é idempotente (link clicado 2x).
+ * - type=signup  → só continua quando a conta carrega convite válido; nunca
+ *                  provisiona organização nova.
  * - type=recovery → sessão de recovery estabelecida; segue para /login/reset
  *                  onde o usuário define a senha nova.
  *
@@ -104,11 +103,15 @@ export async function GET(request: NextRequest) {
     return redirectTo("/login/reset");
   }
 
-  // Foi convidado? Então NÃO ganha organização própria. Sem esta bifurcação,
-  // quem clica no link do convite sem ter conta cria uma, cai aqui sem vínculo
-  // nenhum, e `ensureTenantForUser` faz o que faria com qualquer visitante:
-  // abre uma empresa e o torna admin dela. A pessoa fica com uma organização
-  // fantasma, um wizard que não é dela e o gate de MFA de administrador.
+  // Confirmações que não criam conta também chegam a esta rota. Elas nunca
+  // passam pela decisão de provisionamento: depois de o GoTrue validar o token,
+  // voltam para a área autenticada.
+  if (type && type !== "signup" && type !== "invite") {
+    return redirectTo("/app/inbox");
+  }
+
+  // Foi convidado? Então NÃO ganha organização própria. O único destino válido
+  // de uma conta recém-criada é aceitar exatamente o tenant do convite.
   const decisao = decidirConviteDoSignup(data.user);
 
   if (decisao.tipo === "recusar") {
@@ -130,27 +133,7 @@ export async function GET(request: NextRequest) {
     return redirectTo(`/team/accept-invite/${decisao.token}`);
   }
 
-  try {
-    await ensureTenantForUser(data.user);
-  } catch (e) {
-    await audit({
-      action: "auth.signup_provision_failed",
-      actorUserId: data.user.id,
-      metadata: { reason: e instanceof Error ? e.message : String(e) },
-      requestId,
-    });
-    // A sessão JÁ está firmada (o `verifyOtp`/`exchangeCodeForSession` acima
-    // passou). Mandar para `/login` deixava a pessoa logada e sem organização,
-    // sem nenhum caminho de volta — ver `app/actions/auth/recoverOrganization.ts`.
-    return redirectTo("/get-started");
-  }
-
-  void audit({
-    action: "auth.signup_confirmed",
-    actorUserId: data.user.id,
-    metadata: {},
-    requestId,
-  });
-
-  return redirectTo("/onboarding/welcome");
+  // Exaustividade defensiva: a decisão pura só devolve convite ou recusa. Se
+  // uma variante nova nascer, não pode ganhar provisionamento implícito.
+  return redirectTo("/login?error=convite_invalido");
 }
