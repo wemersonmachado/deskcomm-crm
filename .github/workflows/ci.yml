@@ -25,13 +25,15 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    # Medido: o job foi CANCELADO (não falhou) aos 15min18s, no meio de
-    # `pnpm test:unit` — bateu o teto antigo de 15 minutos, não um teste
-    # quebrado (`invariants`, no mesmo commit, passou). 747 arquivos de teste
-    # + typecheck + lint num runner de 2 núcleos passa de 15min; 30 dá margem
-    # real sem esconder um travamento genuíno (o job ainda morre se passar
-    # disso, só que por um motivo que valeria investigar).
-    timeout-minutes: 30
+    timeout-minutes: 15
+    # Revertido de uma tentativa de 30: `tests/unit/preambulo-do-ci-nao-come-o-
+    # relogio.test.ts` já mede e trava este número de propósito (p90 594s,
+    # máximo 609s em 51 execuções verdes — ~4min45 de folga real). O
+    # cancelamento aos 15min18s num push anterior foi CACHE FRIO de
+    # repositório recém-criado (o preâmbulo `preparar-node` cacheia `~/.npm`,
+    # e a primeira leva de runs aqui não tinha cache nenhum ainda) — não falta
+    # de teto pro trabalho real. Subir o número esconderia esse sintoma em vez
+    # de deixar o cache esquentar sozinho.
     steps:
       - uses: actions/checkout@v7
 
