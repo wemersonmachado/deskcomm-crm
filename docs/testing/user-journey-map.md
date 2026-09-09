@@ -91,6 +91,8 @@ fonte só (`lib/onboarding/passos.ts`) — eram três listas que discordavam. Ga
 | J2.5 | WAHA derrubado (docker stop) | banner claro, botões desabilitados, 503 amigável |
 | J2.6 | Atendente (role agent) não vê botão de conectar | gate admin respeitado na UI |
 | J2.7 | AntiBanSheet: editar ritmo/janela/teto | salva, persiste em `channel_knobs`, validação de janela |
+| J2.8 | Conectar novo WhatsApp — nome de sessão | achado em produção (2026-09-09): `fn_reserve_channel_connection` gerava nome de 69 caracteres; o WAHA (`devlikeapro/waha:latest-2026.7.2`, o default documentado) recusa acima de 54 — TODA tentativa de conectar por QR Code falhava, em qualquer organização, desde que o gerador mudou. Encurtado para 41 caracteres; canais que nunca chegaram a conectar (sem `phone_number`, fora de `WORKING`) foram renomeados no backfill · **PASS** (confirmado ao vivo: QR Code apareceu e o número conectou de verdade) |
+| J2.9 | Card de canal sem apelido nem número ainda | mostrava o id interno da sessão cru (`org_<hex>_<hex>`) até no título do diálogo de excluir — lido em produção como "erro de caracteres". `channelLabel` não devolve mais esse campo · **PASS** |
 
 ## J3 — Agentes de IA `[P0]` (criação) / `[P1]` (rotina)
 
