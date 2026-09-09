@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { requirePlatformAdmin } from "@/lib/auth/requirePlatformAdmin";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
@@ -211,14 +212,20 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const requestId = randomUUID();
   const { id } = await params;
+  const supportDenied = await requireSupportWrite(id);
+  if (supportDenied) return supportDenied;
+
+  const requestId = randomUUID();
 
   let adminCtx: Awaited<ReturnType<typeof requirePlatformAdmin>>;
   try {
     adminCtx = await requirePlatformAdmin();
   } catch {
     return fail("forbidden", "Platform admin required", 403, { requestId });
+  }
+  if (adminCtx.platformAdmin.scope !== "full") {
+    return fail("forbidden", "Seu acesso não permite excluir organizações", 403, { requestId });
   }
 
   let body: z.infer<typeof deleteBodySchema>;

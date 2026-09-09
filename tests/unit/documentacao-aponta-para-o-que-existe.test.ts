@@ -59,6 +59,11 @@ const AUTORIDADE = [
  */
 const PONTEIROS_MORTOS_ACEITOS = new Set([
   "docs/runbooks/ai-credentials-rotation.md::scripts/rotate-ai-cred-aes-key.ts",
+  // Citado de propósito no PASSADO: a nota em threat-model.md explica que o
+  // cadastro só-por-convite REMOVEU este arquivo (junto com ensureTenantForUser
+  // e recoverOrganization) para fechar o risco de organização órfã. Apagar a
+  // citação apagaria a prova de que o arquivo existiu e foi removido por isto.
+  "docs/threat-model.md::lib/auth/provision.ts",
 ]);
 
 /**

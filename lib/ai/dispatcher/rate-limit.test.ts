@@ -29,6 +29,21 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+/**
+ * Este arquivo testa o caminho em MEMÓRIA — nunca deve tocar rede de verdade.
+ * Sem este mock, `getRedis()` usa as `UPSTASH_REDIS_REST_URL/TOKEN` de
+ * `.env`/`.env.local` do ambiente que roda o teste: se apontarem pra um Redis
+ * bem-formado mas INALCANÇÁVEL daqui (ex.: endereço interno de outro
+ * ambiente), o SDK tenta a rede de verdade — e com `vi.useFakeTimers()` ativo
+ * o timeout interno dele nunca dispara (setTimeout fake não avança sozinho),
+ * travando o teste até o timeout do PRÓPRIO Vitest (15s). Forçar
+ * `validarConfigRedisRest` a recusar torna o teste hermético: sempre memória,
+ * em qualquer máquina, com qualquer `.env`.
+ */
+vi.mock("@/lib/redis-config", () => ({
+  validarConfigRedisRest: () => ({ ok: false, reason: "nao_configurado" }),
+}));
+
 describe("contador em memória", () => {
   beforeEach(() => {
     vi.resetModules();

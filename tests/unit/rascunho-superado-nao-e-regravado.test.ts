@@ -51,9 +51,11 @@
  *     explicitamente, com `?? null`.
  */
 import { readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { relativoEmBarraNormal } from "./helpers/caminho";
 
 import { escolherVersoesDaTela } from "@/lib/ai/agents/versoes-da-tela";
 
@@ -424,7 +426,7 @@ describe("nenhum chamador de produção decide a publicada pelo palpite", () => 
         p !== "lib/ai/agents/versoes-da-tela.ts" &&
         readFileSync(join(raiz, p), "utf8").includes("escolherVersoesDaTela("),
     )
-    .map((p) => relative(".", p));
+    .map((p) => relativoEmBarraNormal(raiz, join(raiz, p)));
 
   it("a sonda enxerga alguma coisa (controle positivo)", () => {
     // Sem isto, uma varredura que devolvesse zero arquivo — pasta renomeada,

@@ -39,6 +39,9 @@ export async function POST(
   } catch {
     return fail("forbidden", "Platform admin required", 403, { requestId });
   }
+  if (adminCtx.platformAdmin.scope !== "full") {
+    return fail("forbidden", "Seu acesso não permite suspender organizações", 403, { requestId });
+  }
 
   // Validate body
   let body: z.infer<typeof bodySchema>;

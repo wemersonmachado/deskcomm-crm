@@ -86,6 +86,14 @@ Não há **nenhum** limite de tentativa em:
   não retorna nada. Senha fraca de operador é atacável na velocidade da rede.
 - **`/signup`** — criação de organização em massa; num self-host multi-tenant isso é
   exaustão de recurso (e de cota de IA, se as chaves forem da instância).
+  > **⚠️ ESTA SUB-AFIRMAÇÃO ESPECÍFICA MORREU.** Medido em 2026-09-08: `/signup` não cria
+  > organização nenhuma — cadastro anônimo foi desligado (`enable_signup=false` nas duas
+  > chaves do Supabase local) e a única porta é a Admin API criando conta a partir de um
+  > convite HMAC já emitido por um platform admin ou dono de organização existente.
+  > `ensureTenantForUser`/`lib/auth/provision.ts`/`recoverOrganization` saíram do código. O
+  > risco de "massa de organizações órfãs" fechou pela raiz — não sobrou caminho de criar
+  > organização sem que alguém que já tem uma a peça primeiro. O RESTO da entrada acima
+  > (login sem lockout por IP, accept-invite sondável) segue valendo; só este item morreu.
 - **`/team/accept-invite/:token`** — o HMAC é forte, mas sem limite o atacante pode
   sondar indefinidamente e sem custo, e sem gerar sinal de alerta.
 - **Os 9 crons e `/api/internal/*`** — o secret é forte e a comparação é em tempo

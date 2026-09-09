@@ -39,6 +39,9 @@ export async function POST(
   } catch {
     return fail("forbidden", "Platform admin required", 403, { requestId });
   }
+  if (adminCtx.platformAdmin.scope !== "full") {
+    return fail("forbidden", "Seu acesso não permite resolver incidentes", 403, { requestId });
+  }
 
   let body: z.infer<typeof bodySchema>;
   try {

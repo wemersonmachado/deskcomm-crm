@@ -112,6 +112,7 @@ describe("create_or_move_lead — pontuação/classificação nunca bloqueia a C
       pipelines: [funilRow({ id: PIPE, name: "funil comercial imobiliário" })],
       stages: [ETAPA_ORIGEM, ETAPA_DESTINO],
       leads: [],
+      contacts: [{ id: "contato-1", organization_id: ORG_ID }],
     });
     const action = getAction("create_or_move_lead");
 

@@ -56,8 +56,9 @@ export async function GET(req: NextRequest): Promise<Response> {
   // impersonate — deixá-la trocar aqui contornaria o escopo do acompanhamento.
   if (user.support) return paraTelaDeSuspensao;
 
-  const orgId = req.nextUrl.searchParams.get("org");
-  if (!z.string().uuid().safeParse(orgId).success) return paraTelaDeSuspensao;
+  const orgIdParsed = z.string().uuid().safeParse(req.nextUrl.searchParams.get("org"));
+  if (!orgIdParsed.success) return paraTelaDeSuspensao;
+  const orgId = orgIdParsed.data;
 
   const destino = safeNext(req.nextUrl.searchParams.get("next"), "/app");
 
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   const { data: membership, error } = await db
     .from("user_organizations")
     .select("organization_id, organizations!inner(status)")
-    .eq("organization_id", orgId!)
+    .eq("organization_id", orgId)
     .eq("user_id", user.id)
     .is("revoked_at", null)
     .not("accepted_at", "is", null)
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   const store = await cookies();
   const anterior = store.get("active_org")?.value;
-  store.set("active_org", orgId!, {
+  store.set("active_org", orgId, {
     httpOnly: true,
     sameSite: "strict",
     secure: cookieSecure(),
@@ -91,9 +92,9 @@ export async function GET(req: NextRequest): Promise<Response> {
   await audit({
     action: "organization.switched",
     actorUserId: user.id,
-    organizationId: orgId!,
+    organizationId: orgId,
     resourceType: "organization",
-    resourceId: orgId!,
+    resourceId: orgId,
     metadata: {
       previous_organization_id: z.string().uuid().safeParse(anterior).success
         ? anterior

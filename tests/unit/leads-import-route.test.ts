@@ -1,5 +1,16 @@
+// @vitest-environment node
 /**
  * A IMPORTAÇÃO DE LEADS NÃO ACEITA NADA NO ESCURO.
+ *
+ * Ambiente `node`, não o `jsdom` padrão da suíte: o corpo multipart é montado à
+ * mão (ver `pedido()` abaixo) exatamente para dar a `req.formData()` bytes que
+ * o parser do Next entende — mas sob `jsdom` o `Request`/`FormData` globais são
+ * os do jsdom, e `NextRequest.formData()` (que espera o undici nativo) rejeita
+ * o corpo inteiro com "Envie o arquivo como multipart/form-data.", falhando os
+ * 422/200 de TODA rota nesta suíte por igual, antes de qualquer linha do CSV
+ * ser lida. Confirmado isolando o mesmo `NextRequest` fora do Vitest, em Node
+ * puro: o parse funciona. Mesmo remédio que `lgpd-pdf-meet.test.ts` e
+ * `agenda-google-transport.test.ts` já usam para o mesmo tipo de atrito.
  *
  * Guarda o que a extração do PR #418 mudou de contrato:
  *

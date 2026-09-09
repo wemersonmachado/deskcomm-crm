@@ -71,7 +71,73 @@ async function ownerPatchOrThrow(
     }
   }
 
+  // Mesmo risco do agente acima, só que para humano: a FK de `owner_user_id`
+  // garante que o usuário EXISTE em algum lugar, não que ele é MEMBRO desta
+  // organização. Sem este check um id vazado (ou só adivinhado — são UUIDs
+  // sequenciais de teste em ambiente de demo) atribuiria o negócio como dono a
+  // alguém de outro tenant, e essa pessoa passaria a aparecer nos filtros e
+  // métricas de "meus negócios" de uma organização à qual nunca teve acesso.
+  if (result.patch.owner_user_id !== null) {
+    const { data: membro, error: membroErr } = await supabase
+      .from("user_organizations")
+      .select("user_id")
+      .eq("user_id", result.patch.owner_user_id)
+      .eq("organization_id", ctx.organization_id)
+      .is("revoked_at", null)
+      .not("accepted_at", "is", null)
+      .maybeSingle();
+
+    if (membroErr) {
+      throw new ApiError(500, "internal_error", undefined, ctx.requestId, membroErr.message);
+    }
+    if (!membro) {
+      throw new ApiError(
+        422,
+        "validation_failed",
+        undefined,
+        ctx.requestId,
+        traduzir("Usuário não encontrado nesta organização.", ctx.idioma ?? "pt-BR"),
+      );
+    }
+  }
+
   return result.patch;
+}
+
+/**
+ * `contact_id` chega do CHAMADOR — form, webhook, MCP — e nunca foi validado
+ * contra a organização ativa. A FK (`crm_leads_contact_id_fkey`) garante que o
+ * contato EXISTE, não que é desta org: sem este check, um id vazado (ou uma
+ * planilha de importação com o campo errado) planta um negócio apontando para
+ * o contato de OUTRO tenant. Leitura por RLS fica protegida (o join roda com o
+ * client de sessão), mas qualquer leitura futura por service-role que siga
+ * esse ponteiro (ex.: `lib/leads/radar-de-risco.ts`) vaza o nome do contato
+ * alheio. Mesmo padrão de `ownerPatchOrThrow` acima, para o mesmo defeito.
+ */
+async function contactBelongsToOrgOrThrow(
+  supabase: SB,
+  ctx: HandlerCtx,
+  contactId: string | null | undefined,
+): Promise<void> {
+  if (!contactId) return;
+  const { data: contact, error } = await supabase
+    .from("contacts")
+    .select("id")
+    .eq("id", contactId)
+    .eq("organization_id", ctx.organization_id)
+    .maybeSingle();
+  if (error) {
+    throw new ApiError(500, "internal_error", undefined, ctx.requestId, error.message);
+  }
+  if (!contact) {
+    throw new ApiError(
+      422,
+      "validation_failed",
+      undefined,
+      ctx.requestId,
+      traduzir("Contato não encontrado nesta organização.", ctx.idioma ?? "pt-BR"),
+    );
+  }
 }
 
 function actorAuditPayload(actor: Actor): {
@@ -287,6 +353,8 @@ export async function createLeadHandler(
   }
   const nextPos = maxRow?.position_in_stage ? Number(maxRow.position_in_stage) + 1000 : 1000;
 
+  await contactBelongsToOrgOrThrow(supabase, ctx, input.contact_id);
+
   // Nascer com dono e sem owner_kind é drift silencioso (o CHECK aceita kind
   // null): o lead teria dono e sumiria do filtro e das métricas por kind.
   const ownerPatch =
@@ -405,6 +473,10 @@ export async function updateLeadHandler(
       ctx.requestId,
       traduzir("Lead não encontrado.", ctx.idioma ?? "pt-BR"),
     );
+  }
+
+  if (input.contact_id !== undefined) {
+    await contactBelongsToOrgOrThrow(supabase, ctx, input.contact_id);
   }
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };

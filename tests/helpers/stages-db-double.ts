@@ -111,6 +111,14 @@ export interface DbOpts {
   webhookSources?: Array<Record<string, unknown>>;
   /** Automações — `actions` é jsonb cru, sem FK para o funil. */
   automationRules?: Array<Record<string, unknown>>;
+  /**
+   * Contatos — `app/api/v1/leads/_handler.ts` confere `contact_id` contra a
+   * org antes de gravar (achado da auditoria de segurança de 2026-09-08: sem
+   * isto um `contact_id` de outro tenant era plantado no negócio sem
+   * checagem nenhuma). Quem cria um lead com contato no dublê precisa desta
+   * linha, senão a checagem — correta — recusa com 422.
+   */
+  contacts?: Array<Record<string, unknown>>;
   /** Erro do banco na n-ésima escrita (1-based), como o PostgREST devolveria. */
   writeError?: (n: number, table: string) => { code: string; message: string } | null;
 }
@@ -161,6 +169,12 @@ export function makeDb(opts: DbOpts = {}): Registro {
     },
   };
   const tables = registro.tabelas as unknown as Record<string, Linha[] | undefined>;
+  // Fora de `tabelas` (a interface pública de conferência) de propósito: nada
+  // hoje precisa inspecionar contatos DEPOIS da escrita, só ANTES (a checagem
+  // de tenancy). Ampliar `Registro["tabelas"]` só por isto obrigaria todo
+  // outro teste que já desestrutura `db.tabelas` a saber de uma tabela que
+  // não usa.
+  tables.contacts = (opts.contacts ?? []) as Linha[];
   let nEscrita = 0;
 
   function builder(table: string) {
