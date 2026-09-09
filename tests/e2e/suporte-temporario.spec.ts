@@ -156,6 +156,27 @@ test("suporte mantém identidade, opera B e encerra sem misturar A; readonly/exp
   expect(receiverHits.filter(hit=>hit.startsWith("POST ")).length).toBe(3);
   // Formulário full já aberto não pode atravessar rebaixamento no servidor.
   await page.goto("/app/settings/tenant");
+  const membershipsBefore = (await db.from("user_organizations").select("organization_id,user_id,interface_settings").eq("user_id",actor).order("organization_id")).data;
+  const interfaceRegion = page.getByRole("region", { name: "Interface padrão da organização" });
+  await interfaceRegion.getByLabel("Perfil de interface").selectOption("completa");
+  await page.getByRole("button",{name:"Salvar",exact:true}).click();
+  await expect(page.getByText("Organização atualizada.",{exact:true})).toBeVisible();
+  await acknowledgeKnownAction(page,"/app/settings/tenant");
+  await page.reload();
+  await expect(interfaceRegion.getByLabel("Perfil de interface")).toHaveValue("completa");
+  await interfaceRegion.getByLabel("Perfil de interface").selectOption("simplificada");
+  await interfaceRegion.getByText("Personalizar áreas visíveis",{exact:true}).click();
+  await interfaceRegion.getByRole("checkbox",{name:"Agentes",exact:true}).check();
+  await page.getByRole("button",{name:"Salvar",exact:true}).click();
+  await expect(page.getByText("Organização atualizada.",{exact:true})).toBeVisible();
+  await acknowledgeKnownAction(page,"/app/settings/tenant");
+  expect((await db.from("user_organizations").select("organization_id,user_id,interface_settings").eq("user_id",actor).order("organization_id")).data).toEqual(membershipsBefore);
+  await page.goto("/app/team/invite");
+  await expect(page.getByLabel("Perfil de interface")).toHaveValue("simplificada");
+  await page.getByText("Personalizar áreas visíveis",{exact:true}).click();
+  await expect(page.getByRole("checkbox",{name:"Agentes",exact:true})).toBeChecked();
+  await page.screenshot({path:".superpowers/evidence/comunidade-360/interface-padrao-convite.png"});
+  await page.goto("/app/settings/tenant");
   await page.getByLabel("Nome de exibição").fill("Alteração que deve ser recusada");
   const downgrade=await db.from("platform_admins").update({scope:"support_readonly"}).eq("user_id",actor);if(downgrade.error)throw downgrade.error;
   await page.getByRole("button",{name:"Salvar",exact:true}).click();

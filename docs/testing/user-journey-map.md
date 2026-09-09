@@ -10,6 +10,15 @@
 
 ## Convenções
 
+### Interface padrão editável — 2026-09-09
+
+- [P1] `suporte-temporario.spec.ts`: super admin salva Completa, recarrega,
+  retorna a Simplificada e inclui Agentes; vínculos individuais permanecem
+  idênticos e novo formulário de convite recebe a seleção salva.
+- `organization-interface-default.test.ts`: gravação restrita ao super admin,
+  readonly recusado, seleção validada, organização confiável e preferências
+  individuais intactas. Estado de execução registrado no PR da entrega.
+
 ### Acompanhamento de organização simplificada — 2026-09-09
 
 - [P1] `suporte-temporario.spec.ts`: entrar em B por acompanhamento, clicar em

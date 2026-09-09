@@ -7,6 +7,7 @@ import { moedaServidaOu } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { ZonaDePerigoDaOrganizacao } from "./_danger-zone";
 import { TenantForm } from "./_form";
+import { lerInterface } from "@/lib/navigation/interface";
 
 export const dynamic = "force-dynamic";
 
@@ -41,10 +42,12 @@ export default async function TenantSettingsPage() {
     .maybeSingle();
 
   const row = (data ?? null) as OrgRow | null;
-  const lostReasonsExtra =
-    (row?.settings && Array.isArray((row.settings as { lost_reasons_extra?: unknown }).lost_reasons_extra)
+  const lostReasonsExtra = (
+    row?.settings &&
+    Array.isArray((row.settings as { lost_reasons_extra?: unknown }).lost_reasons_extra)
       ? ((row.settings as { lost_reasons_extra?: string[] }).lost_reasons_extra ?? [])
-      : []) as string[];
+      : []
+  ) as string[];
   const idioma = user.idioma;
 
   return (
@@ -70,6 +73,9 @@ export default async function TenantSettingsPage() {
             dpo_email: row.dpo_email,
             privacy_policy_url: row.privacy_policy_url,
             lost_reasons_extra: lostReasonsExtra,
+            ...(user.is_platform_admin
+              ? { interface_default: lerInterface(row.settings?.interface_default).settings }
+              : {}),
           }}
         />
       )}

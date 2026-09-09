@@ -1,6 +1,8 @@
 "use client";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import Link from "next/link";
+import { InterfaceEditor } from "@/components/team/InterfaceEditor";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -34,9 +36,7 @@ const TIMEZONES = [
 export function TenantForm({ initial }: Props) {
   const t = useT();
   const [form, setForm] = useState<TenantInput>(initial);
-  const [reasonsText, setReasonsText] = useState(
-    (initial.lost_reasons_extra ?? []).join(", "),
-  );
+  const [reasonsText, setReasonsText] = useState((initial.lost_reasons_extra ?? []).join(", "));
   const [isPending, startTransition] = useTransition();
 
   function set<K extends keyof TenantInput>(key: K, value: TenantInput[K]) {
@@ -65,6 +65,25 @@ export function TenantForm({ initial }: Props) {
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl">
       <Card className="space-y-4 p-6">
+        {form.interface_default && (
+          <section className="space-y-3" aria-label={t("Interface padrão da organização")}>
+            <h2 className="font-semibold">{t("Interface padrão da organização")}</h2>
+            <p className="text-sm text-muted-foreground">
+              {t(
+                "Este padrão inicia novos convites. As configurações individuais e os convites já emitidos são preservados.",
+              )}
+            </p>
+            <InterfaceEditor
+              value={form.interface_default}
+              onChange={(value) => set("interface_default", value)}
+              role="admin"
+              disabled={isPending}
+            />
+            <Link href="/app/team" className="text-sm underline">
+              {t("Configurar a interface de cada membro em Equipe")}
+            </Link>
+          </section>
+        )}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="display_name">{t("Nome de exibição")}</Label>
@@ -118,10 +137,7 @@ export function TenantForm({ initial }: Props) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="locale">{t("Idioma")}</Label>
-            <Select
-              value={form.locale}
-              onValueChange={(v) => set("locale", v as Locale)}
-            >
+            <Select value={form.locale} onValueChange={(v) => set("locale", v as Locale)}>
               <SelectTrigger id="locale">
                 <SelectValue />
               </SelectTrigger>
@@ -133,10 +149,7 @@ export function TenantForm({ initial }: Props) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="currency">{t("Moeda")}</Label>
-            <Select
-              value={form.currency}
-              onValueChange={(v) => set("currency", v as MoedaServida)}
-            >
+            <Select value={form.currency} onValueChange={(v) => set("currency", v as MoedaServida)}>
               <SelectTrigger id="currency">
                 <SelectValue />
               </SelectTrigger>
@@ -149,7 +162,9 @@ export function TenantForm({ initial }: Props) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {t("Vale para todo preço do catálogo. Produto já cadastrado guarda a moeda com que nasceu.")}
+              {t(
+                "Vale para todo preço do catálogo. Produto já cadastrado guarda a moeda com que nasceu.",
+              )}
             </p>
           </div>
           <div className="space-y-2">
@@ -175,7 +190,9 @@ export function TenantForm({ initial }: Props) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="lost_reasons">{t("Motivos de perda extras (separados por vírgula)")}</Label>
+          <Label htmlFor="lost_reasons">
+            {t("Motivos de perda extras (separados por vírgula)")}
+          </Label>
           <Input
             id="lost_reasons"
             value={reasonsText}

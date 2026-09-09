@@ -4,6 +4,7 @@ import {
   INTERFACE_COMPLETA,
   interfaceSettingsSchema,
   interfaceTemDestino,
+  type InterfaceSettings,
 } from "@/lib/navigation/interface";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -28,10 +29,14 @@ interface ResultState {
   failed: Array<{ email: string; reason: string }>;
 }
 
-export function InviteForm() {
+export function InviteForm({
+  initialInterface = INTERFACE_COMPLETA,
+}: {
+  initialInterface?: InterfaceSettings;
+}) {
   const t = useT();
   const [emailsRaw, setEmailsRaw] = useState("");
-  const [settings, setSettings] = useState(INTERFACE_COMPLETA);
+  const [settings, setSettings] = useState(initialInterface);
   const [role, setRole] = useState<Role>("agent");
   const [result, setResult] = useState<ResultState | null>(null);
   const invite = useInviteMembers();
@@ -147,7 +152,9 @@ export function InviteForm() {
                   {result.failed.map((f) => (
                     <li key={f.email}>
                       <span className="font-medium">{f.email}</span>{" "}
-                      <span className="text-muted-foreground">— {t(descreverMotivoDaFalha(f.reason))}</span>
+                      <span className="text-muted-foreground">
+                        — {t(descreverMotivoDaFalha(f.reason))}
+                      </span>
                     </li>
                   ))}
                 </ul>

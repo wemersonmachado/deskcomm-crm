@@ -899,7 +899,9 @@ jobs:
         if: always() && matrix.parte == 3
         with:
           name: suporte-menu-evidencia
-          path: .superpowers/evidence/comunidade-360/suporte-menu-agentes.png
+          path: |
+            .superpowers/evidence/comunidade-360/suporte-menu-agentes.png
+            .superpowers/evidence/comunidade-360/interface-padrao-convite.png
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7

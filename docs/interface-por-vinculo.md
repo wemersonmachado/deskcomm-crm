@@ -1,5 +1,7 @@
 # Interface por membro e convite
 
+O super admin pode editar **Interface padrão da organização** em **Administração da organização → Organização**: Completa, Simplificada e áreas visíveis pelo mesmo editor da criação. Salvar altera apenas `organizations.settings.interface_default`, preservando os vínculos individuais, convites já assinados e demais configurações da organização. O formulário de novos convites inicia nesse padrão e permite uma escolha específica para o papel. Membros existentes continuam sendo editados em **Equipe → Interface**, sem propagação automática. A gravação exige super admin e acompanhamento com escrita; é registrada em `org.updated`.
+
 Durante um acompanhamento ativo, o administrador de plataforma tem o bloco **Administração da organização** no início da lateral desktop/mobile. As portas de agentes, credenciais, acervo, uso, conexões, desempenho, auditoria, equipe e organização vêm do catálogo e respeitam o papel efetivo do acompanhamento. O bloco não depende do perfil simplificado do cliente, não grava preferências e some ao encerrar o acompanhamento. Somente leitura não ganha portas que exigem manager/admin.
 
 Para liberar IA ao cliente sem trocar para interface completa: **Acompanhar organização → Equipe → Interface do membro → Personalizar áreas visíveis → Agentes**. A opção também existe ao criar o responsável e emitir convites. A seleção é por vínculo; não altera automaticamente todos os membros. A IA continua sujeita às permissões do papel, inclusive por URL direta.

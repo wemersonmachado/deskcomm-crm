@@ -7,6 +7,7 @@
  * - pipelineConfigPatchSchema: pipeline vocabulary + settings.fields + settings.lost_reasons
  */
 import { z } from "zod";
+import { interfaceSettingsSchema, interfaceTemDestino } from "@/lib/navigation/interface";
 
 import { ehHexValido } from "@/lib/branding/rampa";
 import { IDIOMAS } from "@/lib/i18n/idiomas";
@@ -82,6 +83,9 @@ export type ProfileInput = z.infer<typeof profileSchema>;
 const MOEDAS = MOEDAS_SERVIDAS;
 
 export const tenantSchema = z.object({
+  interface_default: interfaceSettingsSchema
+    .refine((value) => interfaceTemDestino(value, "admin"))
+    .optional(),
   display_name: z.string().min(1).max(120),
   legal_name: z.string().min(1).max(200),
   cnpj: z
@@ -151,9 +155,7 @@ export const customFieldSchema = z.object({
     "url",
   ]),
   required: z.boolean().optional(),
-  options: z
-    .array(z.object({ value: z.string().min(1), label: z.string().min(1) }))
-    .optional(),
+  options: z.array(z.object({ value: z.string().min(1), label: z.string().min(1) })).optional(),
 });
 export type CustomFieldDef = z.infer<typeof customFieldSchema>;
 
@@ -226,8 +228,15 @@ export const marcaDaOrganizacaoSchema = z.object({
 export type MarcaDaOrganizacaoInput = z.infer<typeof marcaDaOrganizacaoSchema>;
 
 /** Prazos por organização. Leitura legada degrada; escrita usa schema estrito. */
-export const agendaSettingsWriteSchema = z.strictObject({
-  confirmation_delay_minutes: z.number().int().min(1).max(10080),
-  unknown_protection_minutes: z.number().int().min(1).max(10080),
-}).refine(v => v.unknown_protection_minutes >= v.confirmation_delay_minutes, {message:"O prazo de proteção deve ser maior que o prazo de confirmação."});
-export const agendaSettingsSchema = agendaSettingsWriteSchema.catch({confirmation_delay_minutes:10,unknown_protection_minutes:1440});
+export const agendaSettingsWriteSchema = z
+  .strictObject({
+    confirmation_delay_minutes: z.number().int().min(1).max(10080),
+    unknown_protection_minutes: z.number().int().min(1).max(10080),
+  })
+  .refine((v) => v.unknown_protection_minutes >= v.confirmation_delay_minutes, {
+    message: "O prazo de proteção deve ser maior que o prazo de confirmação.",
+  });
+export const agendaSettingsSchema = agendaSettingsWriteSchema.catch({
+  confirmation_delay_minutes: 10,
+  unknown_protection_minutes: 1440,
+});
