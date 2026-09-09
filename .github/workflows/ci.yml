@@ -35,7 +35,14 @@ jobs:
         timeout-minutes: 5
 
       - name: Typecheck
+        # `--max-old-space-size=6144`: medido em produção (repo novo, mesmo
+        # `ubuntu-latest` de sempre) — `tsc --noEmit` estourou o heap padrão do
+        # Node e o job morreu com "JavaScript heap out of memory" (exit 134),
+        # sem erro de tipo nenhum por trás. O runner tem ~7GB; 6144MB deixa
+        # margem pro resto do processo (V8 overhead, SO) sem repetir o estouro.
         run: pnpm typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Lint
         run: pnpm lint
