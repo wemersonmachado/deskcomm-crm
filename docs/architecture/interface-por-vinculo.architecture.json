@@ -31,6 +31,13 @@
   ],
   "nodes": [
     {
+      "id": "organization_default",
+      "lane": "humano",
+      "col": 0,
+      "type": "ui",
+      "label": "Organização: super admin edita padrão sem alterar vínculos"
+    },
+    {
       "id": "support_nav",
       "lane": "humano",
       "col": 6,
@@ -102,6 +109,9 @@
     }
   ],
   "edges": [
+    { "from": "support_nav", "to": "organization_default", "label": "Organização" },
+    { "from": "organization_default", "to": "membership", "label": "updateTenant: somente settings.interface_default; org.updated" },
+    { "from": "organization_default", "to": "invite", "label": "formulário inicia no padrão; escolha específica preservada" },
     { "from": "context", "to": "support_nav", "label": "suporte ativo, org conferida e expiração" },
     { "from": "catalog", "to": "support_nav", "label": "destinos canônicos com RBAC" },
     { "from": "support_nav", "to": "editor", "label": "Equipe permite liberar IA ao membro" },

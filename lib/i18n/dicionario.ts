@@ -38,6 +38,9 @@ type Traducoes = Record<string, Partial<Record<Exclude<Idioma, "pt-BR">, string>
 
 export const DICIONARIO: Traducoes = {
   "Administração da organização": { es: "Administración de la organización" },
+  "Interface padrão da organização": { es: "Interfaz predeterminada de la organización" },
+  "Este padrão inicia novos convites. As configurações individuais e os convites já emitidos são preservados.": { es: "Este valor inicia nuevas invitaciones. Se conservan las configuraciones individuales y las invitaciones ya emitidas." },
+  "Configurar a interface de cada membro em Equipe": { es: "Configurar la interfaz de cada miembro en Equipo" },
   "números de teste autorizados": { es: "números de prueba autorizados" },
   "1 número de teste autorizado": { es: "1 número de prueba autorizado" },
   "Nenhum número autorizado — a IA não responde ninguém neste canal.": {

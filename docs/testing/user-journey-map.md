@@ -10,6 +10,15 @@
 
 ## Convenções
 
+### Interface padrão editável — 2026-09-09
+
+- [P1] `suporte-temporario.spec.ts`: super admin salva Completa, recarrega,
+  retorna a Simplificada e inclui Agentes; vínculos individuais permanecem
+  idênticos e novo formulário de convite recebe a seleção salva.
+- `organization-interface-default.test.ts`: gravação restrita ao super admin,
+  readonly recusado, seleção validada, organização confiável e preferências
+  individuais intactas. Estado de execução registrado no PR da entrega.
+
 ### Acompanhamento de organização simplificada — 2026-09-09
 
 - [P1] `suporte-temporario.spec.ts`: entrar em B por acompanhamento, clicar em
@@ -20,8 +29,9 @@
 - CONFIRMADO em `9be77ccd`: componentes e regras passaram; a jornada Playwright
   passou no banco descartável do CI, junto das três partes E2E, `verify`,
   `invariants`, `build-and-size` e `imagens-ok`.
-- Evidência visual inspecionada: artefato `suporte-menu-evidencia`, arquivo
-  `suporte-menu-agentes.png`, run `34314682280`. Integração no PR #3.
+- Evidência visual inspecionada: artefato `suporte-menu-evidencia` na
+  [execução 34314682280](https://github.com/wemersonmachado/deskcomm-crm/actions/runs/34314682280).
+  Integração no PR #3; a imagem pertence ao artefato do CI, não ao checkout.
 - A primeira execução identificou uma expectativa antiga na mensagem de falha
   de troca de organização. A expectativa foi alinhada ao texto vigente, sem
   retirar as verificações de cookie, contexto preservado e isolamento A/B.
