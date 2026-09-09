@@ -896,6 +896,15 @@ jobs:
           SENTRY_DSN: "off"
 
       - uses: actions/upload-artifact@v7
+        if: always() && matrix.parte == 3
+        with:
+          name: suporte-menu-evidencia
+          path: .superpowers/evidence/comunidade-360/suporte-menu-agentes.png
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report-parte-${{ matrix.parte }}
