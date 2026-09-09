@@ -30,12 +30,20 @@ export type ConnectionHealth = "connected" | "connecting" | "down" | "none" | "u
  * garantido: o canal oficial não tem nome de sessão no transporte, e um canal
  * recém-criado ainda não tem apelido nem número — a cadeia sem o último degrau
  * rendia uma opção em branco no seletor.
+ *
+ * `waha_session_name` NUNCA entra no rótulo — ele é o identificador interno da
+ * sessão no transporte (`org_<hex>_<hex>`, gerado por `fn_reserve_channel_connection`),
+ * nunca um nome pensado para gente ler. Um canal recém-criado (sem apelido nem
+ * número ainda) mostrava esse id cru até no título do diálogo de exclusão —
+ * "Excluir org_19f988f164c2429e8ba93a8231c7e630_c742137abce346559f5667e6a39d1645?"
+ * — lido em produção como "erro de caracteres" por quem via a tela, quando na
+ * verdade é o comportamento (indesejável) do último degrau do fallback.
  */
 export function channelLabel(
-  c: Pick<ChannelSession, "display_name" | "phone_number" | "waha_session_name">,
+  c: Pick<ChannelSession, "display_name" | "phone_number">,
   t: (texto: string) => string = (texto) => texto,
 ): string {
-  return c.display_name || c.phone_number || c.waha_session_name || t("Número sem nome");
+  return c.display_name || c.phone_number || t("Número sem nome");
 }
 
 /**
