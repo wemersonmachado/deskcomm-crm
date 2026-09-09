@@ -29,8 +29,9 @@
 - CONFIRMADO em `9be77ccd`: componentes e regras passaram; a jornada Playwright
   passou no banco descartável do CI, junto das três partes E2E, `verify`,
   `invariants`, `build-and-size` e `imagens-ok`.
-- Evidência visual inspecionada: artefato `suporte-menu-evidencia`, arquivo
-  `suporte-menu-agentes.png`, run `34314682280`. Integração no PR #3.
+- Evidência visual inspecionada: artefato `suporte-menu-evidencia` na
+  [execução 34314682280](https://github.com/wemersonmachado/deskcomm-crm/actions/runs/34314682280).
+  Integração no PR #3; a imagem pertence ao artefato do CI, não ao checkout.
 - A primeira execução identificou uma expectativa antiga na mensagem de falha
   de troca de organização. A expectativa foi alinhada ao texto vigente, sem
   retirar as verificações de cookie, contexto preservado e isolamento A/B.

@@ -173,7 +173,9 @@ test("suporte mantém identidade, opera B e encerra sem misturar A; readonly/exp
   expect((await db.from("user_organizations").select("organization_id,user_id,interface_settings").eq("user_id",actor).order("organization_id")).data).toEqual(membershipsBefore);
   await page.goto("/app/team/invite");
   await expect(page.getByLabel("Perfil de interface")).toHaveValue("simplificada");
-  await page.getByText("Personalizar áreas visíveis",{exact:true}).click();
+  await page.getByLabel("Role",{exact:true}).click();
+  await page.getByRole("option",{name:"admin",exact:true}).click();
+  await page.getByText("Personalizar áreas visíveis (personalizada)",{exact:true}).click();
   await expect(page.getByRole("checkbox",{name:"Agentes",exact:true})).toBeChecked();
   await page.screenshot({path:".superpowers/evidence/comunidade-360/interface-padrao-convite.png"});
   await page.goto("/app/settings/tenant");
