@@ -1,5 +1,9 @@
 # Interface por membro e convite
 
+Durante um acompanhamento ativo, o administrador de plataforma tem o bloco **Administração da organização** no início da lateral desktop/mobile. As portas de agentes, credenciais, acervo, uso, conexões, desempenho, auditoria, equipe e organização vêm do catálogo e respeitam o papel efetivo do acompanhamento. O bloco não depende do perfil simplificado do cliente, não grava preferências e some ao encerrar o acompanhamento. Somente leitura não ganha portas que exigem manager/admin.
+
+Para liberar IA ao cliente sem trocar para interface completa: **Acompanhar organização → Equipe → Interface do membro → Personalizar áreas visíveis → Agentes**. A opção também existe ao criar o responsável e emitir convites. A seleção é por vínculo; não altera automaticamente todos os membros. A IA continua sujeita às permissões do papel, inclusive por URL direta.
+
 Em Equipe, quem administra pode escolher **Completa**, **Simplificada** ou personalizar as áreas visíveis de cada membro. A mesma configuração aparece no convite e na criação de organização, para o responsável. A preferência pertence ao vínculo: uma pessoa pode trabalhar com interfaces diferentes em empresas diferentes.
 
 Completa é o padrão de vínculos e convites antigos e acompanha destinos novos. Simplificada oferece Inbox, Agenda, Funis, Contatos, Tarefas e Conexões quando o papel permite. A seleção granular substitui o preset. Trocar o preset restaura sua seleção padrão. Ao menos uma área permitida precisa permanecer selecionada.

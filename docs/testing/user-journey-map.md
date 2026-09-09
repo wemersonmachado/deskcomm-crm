@@ -10,6 +10,16 @@
 
 ## Convenções
 
+### Acompanhamento de organização simplificada — 2026-09-09
+
+- [P1] `suporte-temporario.spec.ts`: entrar em B por acompanhamento, clicar em
+  Administração da organização → Agentes, abrir a lista e sair do acompanhamento.
+  A preferência simplificada do membro permanece intacta; o bloco temporário some.
+- Testes de componente cobrem o link acessível no rail/mobile e o editor granular
+  adicionando/removendo Agentes sem trocar o preset simplificado.
+- Estado desta entrega: testes de componente e regras exercitados; execução da
+  jornada Playwright em banco fresco pendente (Docker indisponível nesta máquina).
+
 - `[P0]` primeira impressão — bug aqui é vergonha pública; prioridade máxima.
 - `[P1]` rotina diária do operador/atendente.
 - `[P2]` exploração/edge.

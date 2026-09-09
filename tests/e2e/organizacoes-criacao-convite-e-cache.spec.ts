@@ -151,7 +151,7 @@ test("org única oferece criação, responsável aceita e A→B→A não mistura
     });
     await page.getByTestId("tenant-switcher").click();
     await page.getByTestId(`tenant-switcher-item-${orgB}`).click({ noWaitAfter: true });
-    await expect(page.getByText("Não foi possível trocar de organização. Seu acesso pode ter mudado. Tente novamente.")).toBeVisible();
+    await expect(page.getByText("Não foi possível trocar de organização. Tente novamente.", { exact: true })).toBeVisible();
     await expect(page.getByTestId("organization-transition")).toHaveCount(0);
     await expect(page.getByTestId("tenant-switcher")).toContainText(`Empresa A ${suffix}`);
     await expect(page.locator("[data-conversation-id]").getByText(`Cliente A ${suffix}`, { exact: true })).toBeVisible();
