@@ -1,0 +1,30 @@
+name: zz-tornar-pacotes-publicos
+
+# Uso único: os pacotes GHCR deste repositório PRIVADO nasceram privados por
+# padrão, e o Railway não tem credencial pra puxar imagem privada. O token
+# pessoal usado nesta sessão não tinha (e não dá pra adicionar sem acesso à
+# UI do GitHub) permissão de Packages. O GITHUB_TOKEN automático deste
+# workflow, com `packages: write`, consegue o que o token pessoal não conseguiu.
+#
+# Apaga este arquivo depois de rodar uma vez — não precisa ficar no repo.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  packages: write
+
+jobs:
+  tornar-publico:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tornar deskcommcrm e deskcomm-worker públicos
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for pacote in deskcommcrm deskcomm-worker deskcomm-scheduler; do
+            echo "--- $pacote ---"
+            gh api --method PATCH "/user/packages/container/$pacote" -f visibility=public || \
+              gh api --method PATCH "/orgs/wemersonmachado/packages/container/$pacote" -f visibility=public || \
+              echo "::warning::não consegui mudar $pacote — confira manualmente"
+          done
