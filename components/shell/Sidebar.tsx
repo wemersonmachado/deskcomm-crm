@@ -11,6 +11,7 @@ import { ConnectionHealthDot } from "@/components/connections/ConnectionHealthDo
 import { VersionFooter } from "@/components/shell/VersionFooter";
 import { useMarcaDaInstalacao } from "@/lib/branding/contexto";
 import { GRUPO_NO_RODAPE, sidebarGroups } from "@/lib/navigation/registry";
+import { SupportNavigation } from "@/components/shell/SupportNavigation";
 
 const CHAVE_GRUPOS_FECHADOS = "sidebar-grupos-fechados";
 
@@ -185,6 +186,7 @@ export function SidebarContent({
         trocar N destinos do menu por um único link de hub devolve (N-1)×32px.
       */}
       <nav className="flex-1 space-y-2 overflow-y-auto p-2" aria-label={t("Navegação principal")}>
+        <SupportNavigation collapsed={collapsed} onNavigate={onNavigate} />
         {grupos.map(({ group, items }) => {
           const tituloId = `nav-grupo-${group.id}`;
           // Recolhido o sidebar inteiro (rail de 64px), o grupo sempre mostra

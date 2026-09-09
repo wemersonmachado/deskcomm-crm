@@ -31,6 +31,13 @@
   ],
   "nodes": [
     {
+      "id": "support_nav",
+      "lane": "humano",
+      "col": 6,
+      "type": "ui",
+      "label": "SupportNavigation: portas administrativas temporárias por papel"
+    },
+    {
       "id": "editor",
       "lane": "humano",
       "col": 0,
@@ -95,6 +102,9 @@
     }
   ],
   "edges": [
+    { "from": "context", "to": "support_nav", "label": "suporte ativo, org conferida e expiração" },
+    { "from": "catalog", "to": "support_nav", "label": "destinos canônicos com RBAC" },
+    { "from": "support_nav", "to": "editor", "label": "Equipe permite liberar IA ao membro" },
     {
       "from": "editor",
       "to": "write",

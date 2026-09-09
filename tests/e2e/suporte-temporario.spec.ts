@@ -120,7 +120,13 @@ test("suporte mantém identidade, opera B e encerra sem misturar A; readonly/exp
   await start(page,orgs[1]!);
   // Sem vínculo físico em B, o acompanhamento usa o padrão visual da própria
   // organização. O perfil simplificado não eleva nem reduz autorização.
-  await expect(page.getByRole("link",{name:"Agentes",exact:true})).toHaveCount(0);
+  const adminNav = page.getByRole("region", { name: "Administração da organização" });
+  await expect(adminNav).toBeVisible();
+  await adminNav.getByRole("link", { name: "Agentes", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Agents de IA", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Novo agente", exact: true })).toBeVisible();
+  await page.screenshot({ path: ".superpowers/evidence/comunidade-360/suporte-menu-agentes.png" });
+  await page.goto("/app/inbox");
   await expect(page.getByRole("link",{name:"Inbox",exact:true})).toBeVisible();
   await expect(sameTab.getByTestId("tenant-switcher")).toContainText(`Suporte B ${suffix}`);
   await expect(sameTab.locator("[data-conversation-id]").getByText(`Contato B ${suffix}`,{exact:true})).toBeVisible();
@@ -171,6 +177,7 @@ test("suporte mantém identidade, opera B e encerra sem misturar A; readonly/exp
   // Evita rejeição não observada se end falhar antes do await da resposta.
   void returnedToA.catch(()=>{});
   await end(page);await returnedToA;
+  await expect(page.getByRole("region", { name: "Administração da organização" })).toHaveCount(0);
   await expect(page.getByTestId("tenant-switcher")).toContainText(`Suporte A ${suffix}`);
   await expect(sameTab.getByTestId("tenant-switcher")).toContainText(`Suporte A ${suffix}`);
   await expect(sameTab.locator("[data-conversation-id]").getByText(`Contato A ${suffix}`,{exact:true})).toBeVisible();
