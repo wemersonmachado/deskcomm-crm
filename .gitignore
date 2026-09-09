@@ -20,6 +20,12 @@ build/
 !.env.example
 !.env.hostgator.example
 
+# Token cru do GitHub (sessao 2026-09-08) — quase foi parar num commit por um
+# `git add -A` de sorte que nao aconteceu. Ja copiado pro .env; este arquivo
+# pode ser apagado com seguranca a qualquer momento. Sem aspas de propósito:
+# gitignore não as interpreta como delimitador, e viraria parte do padrão.
+API GITHUB.txt
+
 # Testing & coverage
 coverage/
 .nyc_output/
