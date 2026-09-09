@@ -8,17 +8,16 @@ import { RecoveryCodesPanel } from "@/components/auth/RecoveryCodesPanel";
 import { MfaEnrollModal } from "@/components/auth/MfaEnrollModal";
 import { regenerateRecoveryCodes } from "@/app/actions/settings/regenerateRecoveryCodes";
 import { signOutEverywhere } from "@/app/actions/settings/signOutEverywhere";
-import {
-  definirExigenciaDeMfa,
-  desativarMfaDaConta,
-} from "@/app/actions/auth/politicaDeMfa";
+import { definirExigenciaDeMfa, desativarMfaDaConta } from "@/app/actions/auth/politicaDeMfa";
 import { useT } from "@/hooks/i18n/useT";
+import { CredentialsPanel } from "./_credentials";
 
 export function SecurityClient({
   mfaEnrolled,
   obrigatorio,
   podeExigirDaEquipe,
   empresaExige,
+  email,
 }: {
   mfaEnrolled: boolean;
   /** A política obriga esta pessoa a ter a verificação? */
@@ -26,6 +25,7 @@ export function SecurityClient({
   /** Só admin muda a regra da empresa. */
   podeExigirDaEquipe: boolean;
   empresaExige: boolean;
+  email: string;
 }) {
   const t = useT();
   const [codes, setCodes] = useState<string[] | null>(null);
@@ -35,11 +35,7 @@ export function SecurityClient({
   const [mexendo, startMexer] = useTransition();
 
   function handleRegenerate() {
-    if (
-      !confirm(
-        t("Gerar novos códigos invalida TODOS os atuais. Tem certeza?"),
-      )
-    ) {
+    if (!confirm(t("Gerar novos códigos invalida TODOS os atuais. Tem certeza?"))) {
       return;
     }
     startTransition(async () => {
@@ -54,12 +50,7 @@ export function SecurityClient({
   }
 
   function handleSignOutAll() {
-    if (
-      !confirm(
-        t("Sair de TODOS os dispositivos? Você precisará fazer login de novo."),
-      )
-    )
-      return;
+    if (!confirm(t("Sair de TODOS os dispositivos? Você precisará fazer login de novo."))) return;
     startSignOut(async () => {
       await signOutEverywhere();
     });
@@ -70,6 +61,8 @@ export function SecurityClient({
       {/* O modal é o MESMO do bloqueador de tela cheia — reusado, não copiado.
           Ele recarrega a página ao terminar, e o servidor reavalia o estado. */}
       {ativando ? <MfaEnrollModal motivo="escolha" /> : null}
+
+      <CredentialsPanel email={email} mfaEnrolled={mfaEnrolled} />
 
       <Card className="space-y-3 p-6">
         <div className="flex items-start justify-between gap-4">
@@ -107,8 +100,7 @@ export function SecurityClient({
                 size="sm"
                 disabled={mexendo}
                 onClick={() => {
-                  if (!confirm(t("Desligar a verificação em duas etapas desta conta?")))
-                    return;
+                  if (!confirm(t("Desligar a verificação em duas etapas desta conta?"))) return;
                   startMexer(async () => {
                     const r = await desativarMfaDaConta();
                     if (!r.ok) {
@@ -179,11 +171,7 @@ export function SecurityClient({
         {codes ? (
           <RecoveryCodesPanel codes={codes} onAcknowledge={() => setCodes(null)} />
         ) : (
-          <Button
-            variant="outline"
-            disabled={!mfaEnrolled || isPending}
-            onClick={handleRegenerate}
-          >
+          <Button variant="outline" disabled={!mfaEnrolled || isPending} onClick={handleRegenerate}>
             {isPending ? t("Gerando…") : t("Regenerar códigos de recuperação")}
           </Button>
         )}
@@ -199,11 +187,7 @@ export function SecurityClient({
         <p className="text-xs text-muted-foreground">
           {t("Listagem de sessões — em breve. Por enquanto, deslogue todos os dispositivos:")}
         </p>
-        <Button
-          variant="outline"
-          disabled={isSigningOut}
-          onClick={handleSignOutAll}
-        >
+        <Button variant="outline" disabled={isSigningOut} onClick={handleSignOutAll}>
           {isSigningOut ? t("Saindo…") : t("Sair de todos os dispositivos")}
         </Button>
       </Card>

@@ -86,7 +86,11 @@ export async function authRateLimited(
   // CONTA (`contaBloqueadaPorFalhas`), que não depende de IP nenhum e é justamente o
   // desenhado para o ataque distribuído.
   if (ip !== null) {
-    const byIp = await checkRateLimit(`auth:${action}:ip:${opaque(ip)}`, limits.ip, limits.windowSec);
+    const byIp = await checkRateLimit(
+      `auth:${action}:ip:${opaque(ip)}`,
+      limits.ip,
+      limits.windowSec,
+    );
     if (!byIp.allowed) return true;
   }
 
@@ -137,6 +141,9 @@ export const AUTH_LIMITS = {
   login: { ip: loginIpLimit(), id: 5, windowSec: 300 },
   signup: { ip: 20, windowSec: 3600 },
   reset: { ip: 30, id: 3, windowSec: 3600 },
+  // Alterar senha ou e-mail pede a senha atual; limitar também essas
+  // confirmações impede transformar a tela autenticada num oráculo de senha.
+  credential_change: { ip: 30, id: 5, windowSec: 300 },
   invite_accept: { ip: 60, windowSec: 3600 },
   // Recuperação do primeiro acesso: o teto mais apertado da lista, e de
   // propósito. Cada acerto CRIA uma organização, e o caminho legítimo é
@@ -158,7 +165,10 @@ export const __LOGIN_IP_DEFAULT_PARA_TESTE = LOGIN_IP_DEFAULT;
  * Efeito: N senhas erradas trancam a conta pela janela, inclusive contra quem
  * distribui as tentativas por muitos IPs. Acertar na 3ª não custa nada.
  */
-export async function contaBloqueadaPorFalhas(email: string, limits: AuthRateLimits): Promise<boolean> {
+export async function contaBloqueadaPorFalhas(
+  email: string,
+  limits: AuthRateLimits,
+): Promise<boolean> {
   if (limits.id === undefined) return false;
   const atual = await peekRateLimit(`auth:login_fail:id:${opaque(email)}`, limits.windowSec);
   return atual >= limits.id;
