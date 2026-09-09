@@ -87,8 +87,10 @@ Não há **nenhum** limite de tentativa em:
 - **`/signup`** — criação de organização em massa; num self-host multi-tenant isso é
   exaustão de recurso (e de cota de IA, se as chaves forem da instância).
   > **⚠️ ESTA SUB-AFIRMAÇÃO ESPECÍFICA MORREU.** Medido em 2026-09-08: `/signup` não cria
-  > organização nenhuma — cadastro anônimo foi desligado (`enable_signup=false` nas duas
-  > chaves do Supabase local) e a única porta é a Admin API criando conta a partir de um
+  > organização nenhuma — cadastro anônimo foi desligado (`[auth] enable_signup = false`,
+  > que vira `GOTRUE_DISABLE_SIGNUP=true`; a chave homônima de `[auth.email]` NÃO é gate de
+  > cadastro e sim o liga/desliga do provider — ver o cabeçalho de `supabase/config.toml`)
+  > e a única porta é a Admin API criando conta a partir de um
   > convite HMAC já emitido por um platform admin ou dono de organização existente.
   > `ensureTenantForUser`/`lib/auth/provision.ts`/`recoverOrganization` saíram do código. O
   > risco de "massa de organizações órfãs" fechou pela raiz — não sobrou caminho de criar

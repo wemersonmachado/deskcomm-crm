@@ -5,10 +5,51 @@ import { describe, expect, it } from "vitest";
 
 const ler = (arquivo: string) => readFileSync(join(process.cwd(), arquivo), "utf8");
 
+/**
+ * Lê `supabase/config.toml` ignorando comentários e devolve o valor de uma
+ * chave DENTRO de uma seção — `contar ocorrências de "= false"` no arquivo
+ * inteiro não distingue as duas chaves homônimas, que fazem coisas opostas.
+ */
+const chaveNaSecao = (secao: string, chave: string): string | undefined => {
+  const linhas = ler("supabase/config.toml")
+    .split(/\r?\n/)
+    .map((l) => l.replace(/#.*$/, "").trim())
+    .filter(Boolean);
+  let atual = "";
+  for (const linha of linhas) {
+    const cabecalho = /^\[([^\]]+)\]$/.exec(linha);
+    if (cabecalho) {
+      atual = cabecalho[1]!;
+      continue;
+    }
+    const par = /^([A-Za-z0-9_]+)\s*=\s*(.+)$/.exec(linha);
+    if (par && atual === secao && par[1] === chave) return par[2]!.trim();
+  }
+  return undefined;
+};
+
 describe("cadastro somente por convite", () => {
-  it("o Supabase local recusa signup anônimo nas duas chaves", () => {
-    const config = ler("supabase/config.toml");
-    expect(config.match(/enable_signup\s*=\s*false/g)).toHaveLength(2);
+  /**
+   * ⚠️ AS DUAS CHAVES SE CHAMAM IGUAL E FAZEM COISAS OPOSTAS.
+   *
+   * A versão anterior deste teste exigia `enable_signup = false` DUAS vezes, e
+   * com isso CONGELAVA UM DEFEITO: `[auth.email] enable_signup` vira
+   * `external_email_enabled` (o provider de e-mail inteiro), não "signup por
+   * e-mail". Com `false` ali, o password grant do GoTrue responde
+   * "Email logins are disabled" e NENHUM usuário existente consegue logar — as
+   * três partes do job `e2e` morriam no seed. O teste ficava verde o tempo
+   * todo, porque contava a string certa pelo motivo errado.
+   *
+   * Quem barra cadastro anônimo é a chave de cima (`disable_signup`), e ela
+   * segue exigida aqui. Ver o cabeçalho de `supabase/config.toml` para a prova
+   * na fonte do CLI e do GoTrue.
+   */
+  it("o cadastro anônimo está desligado no gate que realmente barra", () => {
+    expect(chaveNaSecao("auth", "enable_signup")).toBe("false");
+  });
+
+  it("o provider de e-mail continua ligado, senão ninguém consegue logar", () => {
+    expect(chaveNaSecao("auth.email", "enable_signup")).toBe("true");
   });
 
   it("o instalador fecha o cadastro antes de tentar gravar templates", () => {
