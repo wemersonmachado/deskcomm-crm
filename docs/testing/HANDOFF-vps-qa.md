@@ -24,9 +24,24 @@ os bugs achados na causa raiz.
   tem email) — é onde apareceram bugs de primeira impressão.
 - **Worktree:** `~/DeskcommCRM-qa` (branch `qa/vps-experience`), `node_modules`
   REAL (não symlink), FORA de `/tmp` (foi limpo no meio da sessão 1x).
-- **Config de teste local (NÃO commitar):** `enable_signup = true` no config.toml
-  local libera o password-grant do GoTrue local para o seed; em produção o login
-  do dono bootstrapado funciona normal.
+- ~~**Config de teste local (NÃO commitar):** `enable_signup = true` no config.toml
+  local libera o password-grant do GoTrue local para o seed.~~
+  > **ISTO NÃO ERA CONFIG DE TESTE — ERA UM BUG, E JÁ FOI CONSERTADO NA RAIZ
+  > (2026-09-09).** A sessão que escreveu a linha acima mediu o sintoma certo (o
+  > password-grant do GoTrue morre) e concluiu a causa errada: tratou como
+  > exigência do ambiente de teste algo que quebrava login para TODO mundo,
+  > sempre. `[auth.email] enable_signup` não é o gate de cadastro — ele vira
+  > `external_email_enabled`, o liga/desliga do provider de e-mail inteiro. Com
+  > `false`, `signInWithPassword` responde "Email logins are disabled" a
+  > qualquer usuário existente, e nenhum ambiente escapa disso.
+  >
+  > Hoje `supabase/config.toml` já nasce com `[auth.email] enable_signup = true`
+  > (provider ligado) e `[auth] enable_signup = false` (cadastro anônimo
+  > fechado, que é o gate de verdade). **Não há mais nada para editar local, e
+  > editar aqui volta a derrubar o seed.** O custo de a causa ter ficado
+  > escondida atrás desta linha: as três partes do job `e2e` caíram em
+  > 2026-09-08 sem ninguém ligar os pontos. Ver o cabeçalho de `[auth.email]` em
+  > `supabase/config.toml`.
 
 ## Estado atual (2026-07-20)
 
