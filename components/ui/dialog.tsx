@@ -92,7 +92,16 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      "text-lg font-semibold leading-none tracking-tight",
+      // `break-words`: um título com um token sem espaço (id de sessão, hash,
+      // e-mail longo) não tem onde quebrar por padrão — o navegador prefere
+      // deixar a caixa transbordar a quebrar uma "palavra". Medido em produção
+      // no diálogo de excluir/reconectar canal WhatsApp: o título vinha
+      // `Excluir org_<hex>_<hex>?`, sem espaço nenhum no meio do id, e o
+      // `DialogContent` (que ocupa 100% da viewport no mobile) estourava pra
+      // fora da tela. `leading-none` no mesmo elemento some justamente quando
+      // o texto quebra em duas linhas — por isso troca para `leading-tight`
+      // junto, senão a segunda linha cola na primeira.
+      "text-lg font-semibold leading-tight tracking-tight break-words",
       className
     )}
     {...props}
