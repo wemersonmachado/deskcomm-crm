@@ -33,7 +33,7 @@ export const DEFAULT_LANDING: LandingConfig = {
   theme: "dark", accent: "#8674ff", eyebrow: "ATENDIMENTO + IA + CRM, NO MESMO LUGAR",
   title: "Cada conversa pode ser o começo de uma venda.",
   subtitle: "Dê à sua equipe agentes de IA que conhecem seu negócio. Organize o WhatsApp, acompanhe oportunidades e mantenha pessoas no controle do atendimento.",
-  cta_label: "Conhecer os planos", cta_url: "/#planos",
+  cta_label: "Escolher meu plano", cta_url: "/#planos",
   pain_title: "Seu atendimento cresceu. A organização precisa acompanhar.",
   pain_description: "Mensagens espalhadas, respostas repetidas e oportunidades sem próximo passo consomem o tempo da equipe. Reúna a conversa, o contexto e a ação em um único fluxo.",
   benefits_title: "Menos tarefas repetidas. Mais espaço para atender bem.",
@@ -62,7 +62,7 @@ export const DEFAULT_LANDING: LandingConfig = {
   faq: [
     { question: "Preciso trocar a minha equipe por IA?", answer: "Não. Agentes e pessoas trabalham juntos. Você define a atuação da IA e quando encaminhar a conversa para um atendente." },
     { question: "Posso usar um agente que já tenho?", answer: "A plataforma expõe ferramentas via MCP para integrações externas. A conexão exige um cliente compatível e configuração das permissões da organização." },
-    { question: "Como começo?", answer: "O acesso é liberado por convite do administrador. Entre em contato para definir o escopo e receber as orientações de implantação." },
+    { question: "Como contrato um plano?", answer: "Compare os recursos e escolha Standard, Pro ou Enterprise. A contratação online está em preparação e os preços são ilustrativos: ainda não há pagamento ou ativação automática. Quem já recebeu um convite pode acessar normalmente." },
   ],
   closing_title: "Seu próximo atendimento pode começar melhor.",
   closing_description: "Conheça a operação, escolha seu formato e prepare seu time para transformar conversas em próximos passos.",

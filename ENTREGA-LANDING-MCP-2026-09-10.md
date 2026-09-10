@@ -35,7 +35,7 @@ Rollback da página: reimplantar commit anterior. Coluna aditiva pode permanecer
 - Fontes: removido preload latin-ext em todas as páginas; subconjuntos continuam disponíveis por unicode-range. Não há certificação de ganho em Core Web Vitals.
 - `test:db` depende de Docker, indisponível nesta máquina. Migration aplicada e coluna confirmada não equivalem à suíte de invariantes completa.
 - Skill `cloudflare:web-perf`: auditoria de Core Web Vitals bloqueada por ausência de Chrome DevTools MCP. Não há nota de Lighthouse ou ganho de velocidade certificado.
-- CTA comercial depende do endereço escolhido pelo dono e permanece editável. Não inventar telefone, SLA, clientes ou resultados comerciais.
+- CTA comercial é para contratação dos planos, conforme orientação posterior do dono; não depende de WhatsApp. Sem checkout configurado, informa contratação online em preparação, sem criar conta ou cobrança. Não inventar telefone, SLA, clientes ou resultados comerciais.
 - Segredos não pertencem a este documento. Configuração operacional permanece no ambiente protegido dos serviços; nunca publicar `.env` ou tokens.
 
 ## Fechamento adicional — validação em produção

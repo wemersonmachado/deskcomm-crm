@@ -14,6 +14,15 @@ async function main() {
       await expect(page.getByRole("heading", { level: 1 })).toContainText("Cada conversa");
       await expect(page.getByRole("heading", { name: "Enterprise", exact: true })).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      for (const name of ["Standard", "Pro", "Enterprise"]) {
+        const cta = page.locator("details").filter({ has: page.locator("summary", { hasText: `Contratar ${name}` }) });
+        await cta.locator("summary").click();
+        await expect(cta).toContainText("Nenhuma contratação ou cobrança foi realizada.");
+        await expect(cta.locator("p")).toBeVisible();
+        await cta.locator("summary").click();
+      }
+      await expect(page.getByText(/Conversar sobre o/)).toHaveCount(0);
+      await expect(page.locator('a[href*="wa.me"], a[href*="api.whatsapp.com"]')).toHaveCount(0);
       await page.locator("summary").filter({ hasText: "Preciso trocar a minha equipe por IA?" }).click();
       await expect(page.getByText("Não. Agentes e pessoas trabalham juntos.", { exact: false })).toBeVisible();
       await page.screenshot({ path: `evidence/producao/landing-${width}.png`, fullPage: true });

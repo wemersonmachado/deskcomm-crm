@@ -3,7 +3,7 @@ import { useState, useTransition } from "react";
 import { saveLanding } from "./actions";
 import type { LandingConfig } from "./schema";
 
-const labels: Record<string, string> = { eyebrow: "Chamada inicial", title: "Título principal", subtitle: "Proposta de valor", cta_label: "Texto do botão", cta_url: "Destino do contato (HTTPS, por exemplo WhatsApp comercial)", pain_title: "Título do problema", pain_description: "Descrição do problema", benefits_title: "Título dos benefícios", steps_title: "Título do passo a passo", pricing_title: "Título dos planos", pricing_note: "Condições comerciais", closing_title: "Título final", closing_description: "Mensagem final" };
+const labels: Record<string, string> = { eyebrow: "Chamada inicial", title: "Título principal", subtitle: "Proposta de valor", cta_label: "Texto do botão", cta_url: "Destino da contratação (mantenha /#planos até configurar o checkout)", pain_title: "Título do problema", pain_description: "Descrição do problema", benefits_title: "Título dos benefícios", steps_title: "Título do passo a passo", pricing_title: "Título dos planos", pricing_note: "Condições comerciais", closing_title: "Título final", closing_description: "Mensagem final" };
 const inputClass = "mt-1 w-full rounded-md border bg-background p-2 text-foreground";
 export function SettingsForm({ initial }: { initial: LandingConfig }) {
   const [config, setConfig] = useState(initial);
@@ -13,7 +13,7 @@ export function SettingsForm({ initial }: { initial: LandingConfig }) {
     return <label className="block text-sm" key={label}>{label}{multiline ? <textarea className={inputClass} value={value} maxLength={3000} rows={3} onChange={e => change(e.target.value)} /> : <input className={inputClass} value={value} maxLength={1000} onChange={e => change(e.target.value)} />}</label>;
   }
   return <form className="max-w-4xl space-y-6" onSubmit={e => { e.preventDefault(); start(async () => { try { const result = await saveLanding(config); setStatus(result.error ?? "Página publicada com as alterações salvas."); } catch { setStatus("Não foi possível salvar. Confira sua sessão e tente novamente."); } }); }}>
-    <p className="rounded-lg border p-4 text-sm">Esta página é pública e única para a instalação. Somente o superadministrador pode alterá-la. Os valores iniciais são demonstrativos; nenhuma cobrança é criada. Configure o destino do botão para seu canal comercial antes de divulgar.</p>
+    <p className="rounded-lg border p-4 text-sm">Esta página é pública e única para a instalação. Somente o superadministrador pode alterá-la. Os valores iniciais são demonstrativos; nenhuma cobrança é criada. O CTA é para contratar planos, não para contato. Mantenha /#planos enquanto o checkout não estiver disponível; os botões informarão que a contratação online está em preparação.</p>
     <fieldset disabled={pending} className="space-y-5 rounded-lg border p-5"><legend>Aparência e conteúdo</legend>
       <label className="block text-sm">Tema<select className={inputClass} value={config.theme} onChange={e => setConfig({ ...config, theme: e.target.value as LandingConfig["theme"] })}><option value="dark">Escuro</option><option value="light">Claro</option></select></label>
       <label className="block text-sm">Cor de destaque<input type="color" value={config.accent} onChange={e => setConfig({ ...config, accent: e.target.value })} className="ml-3" /></label>
