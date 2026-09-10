@@ -7,6 +7,14 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
+const novaSenhaSchema = z
+  .string()
+  .min(8, "Senha deve ter pelo menos 8 caracteres")
+  .regex(/[a-z]/, "Senha deve conter uma letra minúscula")
+  .regex(/[A-Z]/, "Senha deve conter uma letra maiúscula")
+  .regex(/\d/, "Senha deve conter um número")
+  .regex(/[^A-Za-z0-9]/, "Senha deve conter um símbolo");
+
 /**
  * Primeiro acesso de quem foi CONVIDADO: a empresa já existe, então pedir o
  * nome dela seria permitir que a pessoa batizasse a organização de terceiros.
@@ -14,7 +22,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export const signupComConviteSchema = z
   .object({
     email: z.string().email("Email inválido"),
-    password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
+    password: novaSenhaSchema,
     password_confirm: z.string(),
   })
   .refine((v) => v.password === v.password_confirm, {
@@ -32,7 +40,7 @@ export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 
 export const resetPasswordSchema = z
   .object({
-    password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres"),
+    password: novaSenhaSchema,
     password_confirm: z.string(),
     // Código TOTP: só exigido quando a conta tem MFA (a sessão de recovery é
     // AAL1 e o GoTrue pede AAL2 para trocar a senha). Opcional no schema; a
@@ -47,7 +55,6 @@ export const resetPasswordSchema = z
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 const senhaAtualSchema = z.string().min(8, "Informe sua senha atual");
-const novaSenhaSchema = z.string().min(8, "Senha deve ter pelo menos 8 caracteres");
 const codigoMfaOpcionalSchema = z
   .string()
   .regex(/^\d{6}$/, "Código de 6 dígitos inválido")

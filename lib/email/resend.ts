@@ -27,6 +27,7 @@
 import { Resend } from "resend";
 
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 interface SendArgs {
   to: string | string[];
@@ -93,12 +94,9 @@ export async function sendEmail(args: SendArgs): Promise<SendResult> {
 
   if (!client || !from) {
     if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        "[email] envio desligado — falta RESEND_API_KEY ou RESEND_FROM_EMAIL. Payload:",
+      logger.warn(
+        "[email] envio desligado — falta RESEND_API_KEY ou RESEND_FROM_EMAIL",
         {
-          to: args.to,
-          subject: args.subject,
-          preview: args.text?.slice(0, 200) ?? args.html.slice(0, 200),
           tem_chave: client !== null,
           tem_remetente: from !== null,
         },
@@ -122,15 +120,15 @@ export async function sendEmail(args: SendArgs): Promise<SendResult> {
       return {
         ok: false,
         error: classificar(String(error.name || ""), error.message ?? ""),
-        details: error.message,
+        details: "O provedor recusou o envio. Confira a configuração de e-mail.",
       };
     }
     return { ok: true, id: data?.id };
-  } catch (err) {
+  } catch {
     return {
       ok: false,
       error: "send_failed",
-      details: err instanceof Error ? err.message : String(err),
+      details: "Não foi possível comunicar com o provedor de e-mail.",
     };
   }
 }

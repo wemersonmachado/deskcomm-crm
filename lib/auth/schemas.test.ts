@@ -1,8 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import { changeEmailSchema, changePasswordSchema } from "@/lib/auth/schemas";
+import {
+  changeEmailSchema,
+  changePasswordSchema,
+  loginSchema,
+  resetPasswordSchema,
+  signupComConviteSchema,
+} from "@/lib/auth/schemas";
 
 describe("schemas de alteração de credenciais", () => {
+  it.each(["apenasminusculas1!", "APENASMAIUSCULAS1!", "SemNumero!", "SemSimbolo1"]) (
+    "rejeita senha nova sem todos os grupos: %s",
+    (password) => {
+      expect(resetPasswordSchema.safeParse({ password, password_confirm: password }).success).toBe(false);
+      expect(signupComConviteSchema.safeParse({ email: "novo@exemplo.com", password, password_confirm: password }).success).toBe(false);
+    },
+  );
+
+  it("preserva login de conta existente com senha de oito caracteres", () => {
+    expect(loginSchema.safeParse({ email: "existente@exemplo.com", password: "abcdefgh" }).success).toBe(true);
+  });
+
   it("exige senha atual e confirmação da senha nova", () => {
     expect(
       changePasswordSchema.safeParse({

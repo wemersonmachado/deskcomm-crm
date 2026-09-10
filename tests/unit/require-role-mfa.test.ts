@@ -77,6 +77,22 @@ beforeEach(() => {
 });
 
 describe("requireRole — MFA é política de sessão, não de cadastro", () => {
+  it("override de plataforma NÃO dispensa MFA em aal1", async () => {
+    preparar({ role: "viewer", temFator: true, aal: "aal1", isPlatformAdmin: true });
+    const r = await requireRole("admin", { allowPlatformAdmin: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect((await r.response.json()).error.code).toBe("mfa_required");
+  });
+
+  it("override de plataforma com aal2 preserva acesso transversal", async () => {
+    preparar({ role: "viewer", temFator: true, aal: "aal2", isPlatformAdmin: true });
+    expect((await requireRole("admin", { allowPlatformAdmin: true })).ok).toBe(true);
+  });
+
+  it("override sem fator permite o cadastro inicial", async () => {
+    preparar({ role: "viewer", temFator: false, aal: "aal1", isPlatformAdmin: true });
+    expect((await requireRole("admin", { allowPlatformAdmin: true })).ok).toBe(true);
+  });
   it("admin com fator cadastrado e sessão aal1 é BARRADO (o achado)", async () => {
     preparar({ role: "admin", temFator: true, aal: "aal1" });
     const r = await requireRole("admin", { requestId: "req-1" });

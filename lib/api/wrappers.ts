@@ -69,11 +69,14 @@ export function fail(
   status: number,
   opts: FailOptions = {},
 ): NextResponse<ApiError> {
+  // Detalhes de infraestrutura não pertencem à resposta pública, em nenhum
+  // ambiente. Preserve código/status/request-id para diagnóstico sem PII.
+  const internal = status >= 500;
   const body: ApiError = {
     error: {
       code,
-      message,
-      ...(opts.details !== undefined ? { details: opts.details } : {}),
+      message: internal ? "Não foi possível concluir a operação. Tente novamente." : message,
+      ...(!internal && opts.details !== undefined ? { details: opts.details } : {}),
     },
   };
 

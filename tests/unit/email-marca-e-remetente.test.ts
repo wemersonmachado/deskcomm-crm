@@ -205,9 +205,9 @@ describe("remetente", () => {
 
     const r = await sendEmail({ to: "a@b.com", subject: "s", html: "<p>x</p>" });
     expect(r.error).toBe("dominio_nao_verificado");
-    // A mensagem crua continua disponível: falhar fechado na AÇÃO, aberto na
-    // INFORMAÇÃO.
-    expect(r.details).toContain("not verified");
+    // A classificação continua acionável sem devolver a mensagem crua do
+    // provedor, que pode carregar configuração ou dado do destinatário.
+    expect(r.details).toBe("O provedor recusou o envio. Confira a configuração de e-mail.");
     vi.doUnmock("resend");
   });
 

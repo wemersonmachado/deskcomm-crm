@@ -54,6 +54,10 @@ Os templates administrados no Supabase são:
 - troca de e-mail e notificações de troca de senha/e-mail;
 - reautenticação e eventos de MFA/identidade vinculada.
 
+A política de senha desta instalação exige oito caracteres ou mais e pelo
+menos uma letra minúscula, uma maiúscula, um número e um símbolo. O aplicativo
+aplica a mesma regra ao convite, recuperação e troca de senha.
+
 O renderizador versionado é
 `hostgator-setup-kit/marca-emails.sh`. Ele aplica os templates e verifica os
 marcadores esperados; execute-o somente com `.env` local completo e sem
@@ -63,8 +67,9 @@ imprimir seu conteúdo.
 
 1. Confirme no Railway que os dois domínios estão `ACTIVE`, verificados e com
    certificado `VALID`.
-2. Confirme no Resend que `mail.xgoos.com.br` está `verified`, incluindo DKIM,
-   SPF e MX.
+2. Confirme que `capabilities.sending` está `enabled` e os registros de DKIM e
+   SPF de envio estão `verified`. `partially_verified` não impede envio quando
+   somente o MX de **recebimento** está pendente. Não confunda inbound com SMTP.
 3. Confirme no Supabase Auth: `site_url=https://xgoos.com.br`, redirects para
    raiz e `www`, SMTP Resend habilitado e cadastro público desabilitado.
 4. Faça um deploy único do Railway após a alteração das variáveis e valide
@@ -76,3 +81,31 @@ imprimir seu conteúdo.
 Para diagnóstico, consulte os painéis de domínio do Railway, de domínio do
 Resend e de Auth do Supabase. Não coloque tokens em URLs, comandos copiados ou
 saídas de terminal.
+
+## Incidente de envio — 2026-09-10
+
+CONFIRMADO por API, não inferido do `.env`: `app` tinha chave Resend, mas não
+`RESEND_FROM_EMAIL`; `worker` não tinha nenhuma das duas. O Supabase estava sem
+SMTP personalizado e com o hook de envio desativado. DKIM e SPF já estavam
+verificados: aguardar o MX de recebimento não resolveria a falta das variáveis.
+
+Correção aplicada: remetente no `app`, chave e remetente no `worker`, SMTP
+Resend no Supabase e releitura exata dos 12 templates versionados. Cadastro
+público permaneceu desabilitado. Redeploys da versão existente, sem incluir
+as alterações locais de segurança ainda em validação:
+
+- app: `104fee71-90e2-4485-ac8a-0135ddef6f37` — SUCCESS;
+- worker: `324819c6-bdfe-4cf8-a5dc-ea76ad6443da` — SUCCESS.
+
+Prova: pedido de recuperação pelo Supabase respondeu HTTP 200; Resend registrou
+`delivered` no evento `87d78d91-d793-4fc3-a6f7-bc6c1a5c3ce2` (2026-09-10 UTC).
+O teste não consumiu o token nem alterou a senha do titular. Não equivale a
+prova de convite de equipe ou exportação LGPD executados pelo frontend/worker.
+O botão foi inspecionado sem exibir seu token: aponta para o domínio canônico,
+`/auth/confirm`, com `type=recovery` e `token_hash` presentes.
+
+DMARC criado e resolvido por DNS público em `_dmarc.xgoos.com.br`:
+`v=DMARC1; p=none`. É modo inicial sem
+quarentena/rejeição. `rua` só deve ser adicionado após confirmar que a caixa de
+relatórios existe. A chave utilizada deve ser rotacionada pelo operador após
+a exposição no chat; este documento deliberadamente não guarda seu valor.

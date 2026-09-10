@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest";
 import { validateOutboundMedia } from "@/lib/messaging/media/upload-validation";
 
 describe("validateOutboundMedia", () => {
+  it.each(["image/svg+xml", "image/html", "video/x-script", "audio/unknown", "text/html"])("rejeita conteúdo ativo ou tipo desconhecido: %s", (mime) => {
+    expect(validateOutboundMedia(mime, 1000).ok).toBe(false);
+  });
+  it.each([NaN, Infinity, -1, 0.5])("rejeita tamanho inválido: %s", (size) => {
+    expect(validateOutboundMedia("image/png", size).ok).toBe(false);
+  });
   it("classifica mimes suportados no kind certo", () => {
     expect(validateOutboundMedia("image/jpeg", 1000)).toEqual({ ok: true, kind: "image" });
     expect(validateOutboundMedia("image/webp", 1000)).toEqual({ ok: true, kind: "image" });
