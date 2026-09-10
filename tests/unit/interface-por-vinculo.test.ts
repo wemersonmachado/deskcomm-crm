@@ -16,7 +16,9 @@ const hrefs = (settings: unknown, role: "agent" | "admin" = "admin", platform = 
   destinosDaInterface(settings, platform, role).map((d) => d.href);
 describe("interface por vínculo é apresentação", () => {
   it("legado completa acompanha catálogo e não duplica IDs", () => {
-    expect(hrefs(null)).toEqual(NAV_CATALOG.map((d) => d.href));
+    expect(hrefs(null, "admin", true)).toEqual(NAV_CATALOG.map((d) => d.href));
+    expect(hrefs(null)).toEqual(NAV_CATALOG.filter((d) => d.href !== "/app/settings/landing-page").map((d) => d.href));
+    expect(hrefs(null)).not.toContain("/app/settings/landing-page");
     expect(new Set(NAV_CATALOG.map((d) => d.href)).size).toBe(NAV_CATALOG.length);
   });
   it("simplificada tem operação e Conexões somente quando papel permite", () => {

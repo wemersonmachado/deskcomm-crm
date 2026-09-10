@@ -27,7 +27,12 @@ Rollback da página: reimplantar commit anterior. Coluna aditiva pode permanecer
 ## Evidências e limites
 
 - Primeira rodada direcionada: 226 testes passaram (landing, MCP, navegação, catálogo e provedores).
-- Verificação completa de produção e evidências visuais: em andamento, não certificadas nesta versão do relatório.
+- Deploy app confirmado SUCCESS: `290ad637-0c1d-4c62-ae74-e6c76c7ff21b` (código `44b4d328`). Worker SUCCESS: `b49f7619-8258-4ccb-93af-30d6019fe333`; drain voltou a processar eventos no boot.
+- Suíte unitária final: 758 arquivos passaram; 8064 testes passaram e 1 falha esperada. Resultado em `evidence/unit-final-clean.log`. Bash e grep do Git adicionados ao PATH da execução Windows, sem alterar os testes de shell para mascarar erros.
+- Typecheck passou. Lint completo: zero erros, 340 avisos; não é correto declarar zero avisos.
+- Provas em produção aprovadas: rascunho salvo/listado/restaurado; opção externa persistida; consulta real MCP autenticada no modo configuração externa; recusa de configuração plataforma sem agente publicado; tenant sem acesso ao editor público; superadmin temporário salva o editor. Fixtures removidas com confirmação.
+- Landing desktop 1440 e celular 390: HTTP 200, sem overflow horizontal, FAQ funcional e sem pageerror. Evidências locais em `evidence/producao/`. Não foram testados todos os runtimes externos ou inferências pagas de todos os provedores; modo plataforma tem cobertura unitária de projeção/isolamento, não atendimento externo completo.
+- Fontes: removido preload latin-ext em todas as páginas; subconjuntos continuam disponíveis por unicode-range. Não há certificação de ganho em Core Web Vitals.
 - `test:db` depende de Docker, indisponível nesta máquina. Migration aplicada e coluna confirmada não equivalem à suíte de invariantes completa.
 - Skill `cloudflare:web-perf`: auditoria de Core Web Vitals bloqueada por ausência de Chrome DevTools MCP. Não há nota de Lighthouse ou ganho de velocidade certificado.
 - CTA comercial depende do endereço escolhido pelo dono e permanece editável. Não inventar telefone, SLA, clientes ou resultados comerciais.
