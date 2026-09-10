@@ -146,7 +146,6 @@ export async function getOrCreateAgentCreationDraftAction(): Promise<
     requestId: randomUUID(),
     metadata: { kind: "mcp_agent", creation_state: "incomplete" },
   });
-  revalidatePath("/app/ai/agents");
   return { ok: true, data: { agent_id: created.id } };
 }
 
