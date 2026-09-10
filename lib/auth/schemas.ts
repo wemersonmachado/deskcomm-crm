@@ -20,10 +20,6 @@ export const signupComConviteSchema = z
   .refine((v) => v.password === v.password_confirm, {
     path: ["password_confirm"],
     message: "As senhas não coincidem",
-  })
-  .refine((v) => v.password !== v.current_password, {
-    path: ["password"],
-    message: "A nova senha deve ser diferente da atual",
   });
 
 export type SignupComConviteInput = z.infer<typeof signupComConviteSchema>;
@@ -46,6 +42,10 @@ export const resetPasswordSchema = z
   .refine((v) => v.password === v.password_confirm, {
     path: ["password_confirm"],
     message: "As senhas não coincidem",
+  })
+  .refine((v) => v.password !== v.current_password, {
+    path: ["password"],
+    message: "A nova senha deve ser diferente da atual",
   });
 
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
