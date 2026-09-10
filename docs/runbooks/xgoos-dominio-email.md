@@ -109,3 +109,12 @@ DMARC criado e resolvido por DNS público em `_dmarc.xgoos.com.br`:
 quarentena/rejeição. `rua` só deve ser adicionado após confirmar que a caixa de
 relatórios existe. A chave utilizada deve ser rotacionada pelo operador após
 a exposição no chat; este documento deliberadamente não guarda seu valor.
+
+## Hardening publicado — 2026-09-10
+
+O deployment `a8f1e744-7919-4a2a-968a-358914811290` publicou CSP com nonce,
+HSTS, sanitização de respostas 5xx, exigência de MFA no override de plataforma,
+allowlist de mídia e remoção de conteúdo de e-mail dos logs. A leitura em
+produção confirmou saúde de Supabase/Redis/WAHA e renderização do login sem
+erros no navegador. O CAPTCHA não deve ser ativado até existir um widget
+Turnstile e as chaves terem sido integradas ao cliente e ao Supabase.

@@ -9,6 +9,12 @@ principal `D:/PROJETOS/Agentes/Agentes/DeskComm`.
 
 ## Produção confirmada
 
+Código de segurança publicado no Railway pelo deployment
+`a8f1e744-7919-4a2a-968a-358914811290` (`SUCCESS`). Após a troca, a produção
+respondeu saudável com Supabase, Redis e WAHA em `ok`; login HTTP 200 em
+Chromium, CSP/nonce/HSTS/request-id presentes, zero erros de console, API de
+equipe sem sessão em 401 e `/app` redirecionando para login.
+
 Envio da recuperação de senha pelo Supabase, transportado pelo SMTP Resend:
 HTTP 200 e evento Resend `delivered`. Os 12 templates foram aplicados e relidos.
 App e worker receberam as variáveis necessárias e foram redeployados com a
@@ -64,8 +70,9 @@ foram fixtures, identificadores internos, evidências e um hash legado; nenhum
 valor coincidiu com as credenciais operacionais atuais. Isso não elimina a
 necessidade de rotação da chave Resend exposta no chat.
 
-Nenhuma auditoria permite afirmar segurança absoluta. Os bloqueios externos
-acima permanecem explicitamente delimitados.
+Nenhuma auditoria permite afirmar segurança absoluta. O Turnstile e o recurso
+HIBP dependente de plano permanecem explicitamente delimitados; todo o restante
+desta entrega foi publicado e relido em produção.
 
 ## Encerramento da correção de e-mail
 
