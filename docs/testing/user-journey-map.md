@@ -10,6 +10,12 @@
 
 ## Convenções
 
+### Landing e contrato MCP — 2026-09-10
+
+- [P1] `scripts/qa-landing-visual.ts`: página pública desktop/mobile, FAQ, overflow e erros de JavaScript; evidência em `evidence/producao/`. Produção existente, não instalação fresca.
+- [P1] `scripts/qa-landing-mcp-production.ts`: login sintético pela tela, rascunho persistido/listado/restaurado, seleção de executor/origem, contrato MCP publicado e recusa cross-tenant, editor público recusado ao tenant e permitido a superadmin temporário. Fixtures isoladas e removidas; execução exige opt-in explícito.
+- Não substituem `tests/e2e` com baseline fresco ou `test:db`. Não provam inferência/atendimento de uma VPS externa. Relatório na raiz: `ENTREGA-LANDING-MCP-2026-09-10.md`.
+
 ### Interface padrão editável — 2026-09-09
 
 - [P1] `suporte-temporario.spec.ts`: super admin salva Completa, recarrega,

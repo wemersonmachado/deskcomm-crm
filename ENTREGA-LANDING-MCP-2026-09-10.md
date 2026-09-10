@@ -37,3 +37,14 @@ Rollback da página: reimplantar commit anterior. Coluna aditiva pode permanecer
 - Skill `cloudflare:web-perf`: auditoria de Core Web Vitals bloqueada por ausência de Chrome DevTools MCP. Não há nota de Lighthouse ou ganho de velocidade certificado.
 - CTA comercial depende do endereço escolhido pelo dono e permanece editável. Não inventar telefone, SLA, clientes ou resultados comerciais.
 - Segredos não pertencem a este documento. Configuração operacional permanece no ambiente protegido dos serviços; nunca publicar `.env` ou tokens.
+
+## Fechamento adicional — validação em produção
+
+- `scripts/qa-landing-mcp-production.ts`: teste reproduzível e opt-in (`QA_ALLOW_PRODUCTION_FIXTURES=1`). Cria identidades e duas organizações sintéticas, valida pelo navegador e por MCP HTTP real, remove as fixtures ao terminar. Não dispara e-mails, WhatsApp ou inferência paga. Usa as variáveis protegidas `NEXT_PUBLIC_SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`; nunca inserir valores no script.
+- PASS: rascunho preenchido pela tela, confirmado no banco, listado e restaurado; modo externo salvo e consultado pelo MCP; configuração publicada selecionada pela tela e entregue pelo MCP sem `credential_id`; referência a agente **publicado de outra organização** recusada sem devolver seu prompt; tenant bloqueado no editor e superadmin temporário autorizado.
+- A configuração publicada foi preparada como fixture inerte (sem credencial de LLM e canal parado). Esse teste prova seleção, persistência, contrato e isolamento, **não** o fluxo de publicação nem atendimento real do agente.
+- `scripts/qa-landing-visual.ts`, com `QA_BASE_URL=https://xgoos.com.br`: desktop 1440 e celular 390 aprovados novamente. Observações desta rodada: TTFB 268/365 ms, DOMContentLoaded 556/926 ms, 24 recursos. São amostras pontuais, não Lighthouse/Core Web Vitals nem SLA.
+- Confirmação Railway: app e worker mantêm os deployments SUCCESS acima. Nesta rodada só houve testes/documentação, sem mudança de código de runtime ou novo deploy desnecessário.
+- Teste de banco continua bloqueado por Docker ausente; `gh` sem autenticação impediu consultar CI privado. Não executar os invariantes destrutivos sobre produção como alternativa.
+- Limite adicional explícito: carregar o renderizador LGPD sob demanda isolou sua falha e recuperou o boot do worker; **não prova que a exportação PDF LGPD foi corrigida**. A falha de importação `@react-pdf/hyphenate` precisa de reprodução e prova específicas antes de aprovar essa jornada.
+- A entrega de landing/MCP está publicada e tem as provas acima. Aprovação integral da plataforma continua condicionada às jornadas e dependências não exercitadas; não declarar “100% seguro” ou todos os fluxos aprovados.
