@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Criação persistente e conexão de agentes",
+    "subtitle": "Rascunho recuperável, conclusão guiada, provedores e MCP org-scoped",
+    "output": "criacao-e-conexao-de-agentes.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    { "id": "pessoa", "label": "Pessoa" },
+    { "id": "app", "label": "Aplicativo" },
+    { "id": "dados", "label": "Dados e integrações" }
+  ],
+  "mainPath": ["novo", "autosave", "registro", "concluir", "runtime"],
+  "nodes": [
+    { "id": "novo", "lane": "pessoa", "col": 0, "type": "frontend", "label": "Agentes › Novo agente", "sublabel": "abre ou retoma o rascunho incompleto" },
+    { "id": "guia", "lane": "pessoa", "col": 1, "type": "frontend", "label": "Guia de conclusão", "sublabel": "explica campos pendentes e estado do salvamento" },
+    { "id": "lista", "lane": "pessoa", "col": 5, "type": "frontend", "label": "Lista de agentes", "sublabel": "retomar ou apagar rascunho; abrir conexão MCP" },
+    { "id": "autosave", "lane": "app", "col": 2, "type": "backend", "label": "Server Actions de criação", "sublabel": "Zod + admin + organização ativa + debounce" },
+    { "id": "concluir", "lane": "app", "col": 3, "type": "backend", "label": "saveAgentDraftAction", "sublabel": "cria a primeira versão e encerra o marcador" },
+    { "id": "runtime", "lane": "app", "col": 5, "type": "backend", "label": "Registry de provedores", "sublabel": "Anthropic, OpenAI, Google, OpenRouter, Mistral, Groq e Cloudflare" },
+    { "id": "registro", "lane": "dados", "col": 2, "type": "database", "label": "ai_agents.config.creation_draft", "sublabel": "campos conhecidos, sem segredos; tenant explícito" },
+    { "id": "versao", "lane": "dados", "col": 4, "type": "database", "label": "ai_agent_versions", "sublabel": "versão validada pronta para publicação" },
+    { "id": "credencial", "lane": "dados", "col": 4, "type": "security", "label": "Cofre de credenciais da organização", "sublabel": "segredo cifrado e validado pelo provedor" },
+    { "id": "mcp", "lane": "dados", "col": 6, "type": "external", "label": "Agente externo via /api/mcp", "sublabel": "bearer exclusivo, scopes mínimos, organização fixada pelo token" },
+    { "id": "audit", "lane": "dados", "col": 3, "type": "database", "label": "api_audit_log", "sublabel": "criação, alteração, versão e arquivamento" }
+  ],
+  "edges": [
+    { "from": "novo", "to": "autosave", "label": "abrir, editar e sair" },
+    { "from": "autosave", "to": "registro", "label": "persistir formulário parcial" },
+    { "from": "registro", "to": "guia", "label": "rehidratar e mostrar pendências" },
+    { "from": "guia", "to": "concluir", "label": "liberar quando válido" },
+    { "from": "concluir", "to": "versao", "label": "criar primeira versão" },
+    { "from": "concluir", "to": "audit", "label": "registrar mutação" },
+    { "from": "versao", "to": "runtime", "label": "provider e model publicados" },
+    { "from": "credencial", "to": "runtime", "label": "descriptografar somente no servidor" },
+    { "from": "registro", "to": "lista", "label": "rascunho incompleto visível" },
+    { "from": "lista", "to": "novo", "label": "retomar edição" },
+    { "from": "lista", "to": "mcp", "label": "criar token e copiar endpoint" },
+    { "from": "mcp", "to": "audit", "label": "ações externas auditadas" }
+  ]
+}

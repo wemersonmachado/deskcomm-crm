@@ -246,7 +246,11 @@ describe("a corrente inteira: lista × execução × tela", () => {
     const recusados: string[] = [];
     for (const id of IDS_DE_PROVEDOR) {
       try {
-        buildModel(id, "chave-de-teste", "modelo/qualquer");
+        const chave =
+          id === "cloudflare"
+            ? "0123456789abcdef0123456789abcdef:token-cloudflare-falso-com-tamanho-valido"
+            : "chave-de-teste";
+        buildModel(id, chave, "modelo/qualquer");
       } catch {
         recusados.push(id);
       }

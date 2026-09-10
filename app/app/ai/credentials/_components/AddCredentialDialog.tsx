@@ -201,6 +201,9 @@ export function AddCredentialDialog({ open, onOpenChange }: Props) {
             {errors.api_key && (
               <p className="text-xs text-destructive">{errors.api_key}</p>
             )}
+            {"comoInformarChave" in provedor && provedor.comoInformarChave && !errors.api_key ? (
+              <p className="text-xs text-muted-foreground">{t(provedor.comoInformarChave)}</p>
+            ) : null}
           </div>
 
           <DialogFooter>

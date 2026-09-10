@@ -25,6 +25,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
+import { parseCloudflareAiCredential } from "@/lib/ai/cloudflare-credential";
 import { generateText, stepCountIs, type LanguageModel, type StopCondition, type ToolSet } from "ai";
 
 // Fonte única do endpoint — a mesma constante que o registry de produção usa.
@@ -182,6 +183,18 @@ export function buildModel(provider: string, apiKey: string, modelId: string): L
         baseURL: OPENROUTER_ENDPOINT,
         headers: cabecalhosDeAtribuicaoOpenRouter(),
       })(modelId);
+    case "mistral":
+      return createOpenAI({ apiKey, baseURL: "https://api.mistral.ai/v1" })(modelId);
+    case "groq":
+      return createOpenAI({ apiKey, baseURL: "https://api.groq.com/openai/v1" })(modelId);
+    case "cloudflare": {
+      const parsed = parseCloudflareAiCredential(apiKey);
+      if (!parsed) throw new Error("cloudflare_credential_invalid");
+      return createOpenAI({
+        apiKey: parsed.apiToken,
+        baseURL: `https://api.cloudflare.com/client/v4/accounts/${parsed.accountId}/ai/v1`,
+      })(modelId);
+    }
     default:
       throw new Error(`unsupported_provider: ${provider}`);
   }

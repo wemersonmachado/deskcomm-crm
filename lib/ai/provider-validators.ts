@@ -8,7 +8,8 @@
  *
  * Timeout 5s, sem retry. Erros 401 são distintos de erros de rede.
  */
-import { PROVEDORES } from "@/lib/ai/pontos/provedores";
+import type { PROVEDORES } from "@/lib/ai/pontos/provedores";
+import { parseCloudflareAiCredential } from "@/lib/ai/cloudflare-credential";
 
 /**
  * Os provedores cuja CHAVE este arquivo sabe validar.
@@ -84,6 +85,63 @@ export async function validateOpenAIKey(apiKey: string): Promise<ValidationResul
     const json = (await res.json()) as { data?: { id: string }[] };
     const models = (json.data ?? []).map((m) => m.id).filter(Boolean);
     return { ok: true, models };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.name : "network_error" };
+  }
+}
+
+async function validateOpenAiCompatibleKey(
+  apiKey: string,
+  modelsUrl: string,
+): Promise<ValidationResult> {
+  try {
+    const res = await timedFetch(modelsUrl, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, error: "auth_failed_401" };
+    }
+    if (!res.ok) return { ok: false, error: `provider_status_${res.status}` };
+    const json = (await res.json()) as { data?: { id?: string }[] };
+    return {
+      ok: true,
+      models: (json.data ?? []).map((model) => model.id ?? "").filter(Boolean),
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.name : "network_error" };
+  }
+}
+
+export function validateMistralKey(apiKey: string): Promise<ValidationResult> {
+  return validateOpenAiCompatibleKey(apiKey, "https://api.mistral.ai/v1/models");
+}
+
+export function validateGroqKey(apiKey: string): Promise<ValidationResult> {
+  return validateOpenAiCompatibleKey(apiKey, "https://api.groq.com/openai/v1/models");
+}
+
+export async function validateCloudflareKey(credential: string): Promise<ValidationResult> {
+  const parsed = parseCloudflareAiCredential(credential);
+  if (!parsed) return { ok: false, error: "cloudflare_credential_format_invalid" };
+  try {
+    const res = await timedFetch(
+      `https://api.cloudflare.com/client/v4/accounts/${parsed.accountId}/ai/models/search?hide_experimental=true&include_deprecated=false&per_page=50`,
+      { method: "GET", headers: { Authorization: `Bearer ${parsed.apiToken}` } },
+    );
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, error: "auth_failed_401" };
+    }
+    if (!res.ok) return { ok: false, error: `provider_status_${res.status}` };
+    const json = (await res.json()) as {
+      success?: boolean;
+      result?: Array<{ name?: string; id?: string }>;
+    };
+    if (json.success === false) return { ok: false, error: "provider_rejected" };
+    return {
+      ok: true,
+      models: (json.result ?? []).map((model) => model.name ?? model.id ?? "").filter(Boolean),
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.name : "network_error" };
   }
@@ -182,6 +240,12 @@ export function validateProviderKey(
       return validateGoogleKey(apiKey);
     case "openrouter":
       return validateOpenRouterKey(apiKey);
+    case "mistral":
+      return validateMistralKey(apiKey);
+    case "groq":
+      return validateGroqKey(apiKey);
+    case "cloudflare":
+      return validateCloudflareKey(apiKey);
     default: {
       // Sem `never` aqui: `Provider` agora é derivado de PROVEDORES, e a lista
       // cresce sem que este arquivo saiba. Provedor novo cadastrado antes de

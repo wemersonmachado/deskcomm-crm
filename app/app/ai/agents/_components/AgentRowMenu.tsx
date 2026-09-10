@@ -48,6 +48,8 @@ export function AgentRowMenu({ agent }: Props) {
   const status = deriveAgentStatus(agent);
   const isPaused = status === "paused" || status === "draft";
   const isArchived = status === "archived";
+  const incomplete =
+    (agent.config?.creation_draft as { state?: unknown } | undefined)?.state === "incomplete";
 
   const run = (label: string, action: () => Promise<{ ok: boolean; error?: string; message?: string }>) => {
     startTransition(async () => {
@@ -124,7 +126,7 @@ export function AgentRowMenu({ agent }: Props) {
             }}
             className="text-destructive focus:text-destructive"
           >
-            <Archive size={14} aria-hidden className="mr-2" /> {t("Arquivar")}
+            <Archive size={14} aria-hidden className="mr-2" /> {incomplete ? t("Apagar rascunho") : t("Arquivar")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -139,12 +141,12 @@ export function AgentRowMenu({ agent }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t("Arquivar")} &ldquo;{agent.name}&rdquo;?
+              {incomplete ? t("Apagar rascunho") : t("Arquivar")} &ldquo;{agent.name}&rdquo;?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t(
-                "O agent deixa de responder gatilhos e some das listas ativas. Versões publicadas são preservadas para auditoria. Não é possível desarquivar pela UI nesta versão.",
-              )}
+              {incomplete
+                ? t("O rascunho sai da lista ativa. A remoção é segura e fica preservada no histórico de auditoria.")
+                : t("O agent deixa de responder gatilhos e some das listas ativas. Versões publicadas são preservadas para auditoria. Não é possível desarquivar pela UI nesta versão.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -154,7 +156,7 @@ export function AgentRowMenu({ agent }: Props) {
                 run(t("Agent arquivado."), () => archiveAgentAction(agent.id))
               }
             >
-              {t("Arquivar")}
+              {incomplete ? t("Apagar rascunho") : t("Arquivar")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

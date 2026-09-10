@@ -621,13 +621,13 @@ describe("DELETE /api/v1/pipelines/[id]/stages/[stageId]", () => {
     expect(db.escritas.map((e) => e.table)).toEqual(["crm_leads"]);
     expect(db.tabelas.crm_stages.find((e) => e.id === "e2")?.is_archived).toBe(false);
 
-    // A frase é escrita para leigo — o texto do banco vai em `details`, nunca
-    // colado nela. Sem esta metade, `${error.message}` no meio da mensagem
-    // passa despercebido.
-    const body = (await res.json()) as { error: { message: string; details: { erro: string } } };
-    expect(body.error.message).toContain("«Proposta»");
+    // Erros internos usam mensagem pública uniforme; detalhes de banco não
+    // atravessam a borda e o request-id mantém a correlação operacional.
+    const body = (await res.json()) as { error: { message: string; details?: unknown } };
+    expect(body.error.message).toBe("Não foi possível concluir a operação. Tente novamente.");
     expect(body.error.message).not.toContain("connection failure");
-    expect(body.error.details.erro).toBe("connection failure");
+    expect(body.error.details).toBeUndefined();
+    expect(res.headers.get("x-request-id")).toBeTruthy();
   });
 });
 

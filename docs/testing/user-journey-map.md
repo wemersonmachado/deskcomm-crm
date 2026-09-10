@@ -1973,6 +1973,18 @@ Browser r3 passou **2 jornadas/30,0s**, appprodução3013, sessão e PostgREST r
 
 Testes: `tests/e2e/agenda-google-meet.spec.ts`, `tests/invariants/agenda-meet.test.ts`, `tests/invariants/agenda-meet-export.test.ts`, `tests/unit/agenda-meet*.test.ts*` e `tests/unit/lgpd-pdf-meet.test.ts`. Unit integral710arquivos/7671PASS+1expectedfail; DB integral171arquivos/1386PASS+1expectedfail+1skip, INSTALL/UPDATE PG15. Após o reparo runtime,75casos focados/type/lint e novo build/browser passaram; sem repetição do DB sem delta SQL.0226 aplicada/imutável no QA, junto com0224/0225. Limpeza0organizações/0usuários meet-ui, app/receivers/pools encerrados e namespace demo preservado. Histórico e limites completos em `.superpowers/sdd/comunidade-360/task-8-report.md`.
 
+### Criação persistente e conexão de agentes
+
+- [P0] `tests/e2e/agente-novo-e-uso.spec.ts`: abrir Novo agente, preencher parte do
+  nome, observar o autosave, sair para a lista e retomar o mesmo rascunho sem
+  perda; a tela nomeia cada etapa pendente e só libera a conclusão quando a
+  configuração inteira é válida.
+- [P1] A lista identifica configuração incompleta e oferece a porta
+  **Conectar agente externo (MCP)**. A execução externa usa `/api/mcp`, token
+  org-scoped e scopes mínimos; o teste de transporte com um runtime externo
+  real depende de uma credencial/controlador escolhido pelo operador e não é
+  simulado como entrega externa.
+
 ### Autonomia e revisão de respostas (Task9)
 
 - [P0] Agente sem publicação: salvar versão, testar cenário e ver candidata/propostas sem mensagem operacional. Mesmo ritual de abertura, compactação e fechamento; provedor controlado deve ser identificado como tal.

@@ -55,6 +55,8 @@ export function modeloEmVigor(agent: AgentRow): string {
 export function AgentCard({ agent, canWrite }: Props) {
   const t = useT();
   const status = deriveAgentStatus(agent);
+  const incomplete =
+    (agent.config?.creation_draft as { state?: unknown } | undefined)?.state === "incomplete";
 
   return (
     <Card className="flex h-full flex-col gap-3 p-4">
@@ -81,11 +83,17 @@ export function AgentCard({ agent, canWrite }: Props) {
             </Badge>
           )}
           <AgentStatusBadge status={status} />
+          {incomplete && <Badge variant="outline">{t("Configuração incompleta")}</Badge>}
           {canWrite && <AgentRowMenu agent={agent} />}
         </div>
       </div>
       {agent.description && (
         <p className="line-clamp-2 text-xs text-muted-foreground">{agent.description}</p>
+      )}
+      {incomplete && (
+        <p className="text-xs text-amber-700 dark:text-amber-300">
+          {t("Seu progresso foi salvo. Abra o rascunho para concluir ou use o menu para apagá-lo.")}
+        </p>
       )}
       <dl className="grid grid-cols-2 gap-2 pt-1 text-xs">
         <div>

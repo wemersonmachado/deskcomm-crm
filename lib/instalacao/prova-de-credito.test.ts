@@ -16,11 +16,16 @@ import {
 import { IDS_DE_PROVEDOR } from "@/lib/ai/pontos/provedores";
 
 describe("montarRequisicaoDeProva", () => {
+  const chaveDeTeste = (provider: string) =>
+    provider === "cloudflare"
+      ? "0123456789abcdef0123456789abcdef:token-cloudflare-de-teste"
+      : "k";
+
   it("sabe cobrar TODOS os provedores que a lista oferece", () => {
     // Se a lista ganhar um provedor e este módulo não souber testá-lo, o
     // diagnóstico ficaria mudo justamente para quem escolheu o mais novo.
     const semProva = IDS_DE_PROVEDOR.filter(
-      (id) => montarRequisicaoDeProva(id, "k", "m") === null,
+      (id) => montarRequisicaoDeProva(id, chaveDeTeste(id), "m") === null,
     );
     expect(semProva).toEqual([]);
   });
@@ -28,7 +33,7 @@ describe("montarRequisicaoDeProva", () => {
   it("é uma GERAÇÃO, não uma listagem — é o que o provedor cobra", () => {
     // O ponto do arquivo inteiro: listar modelos passa com saldo zero.
     for (const id of IDS_DE_PROVEDOR) {
-      const req = montarRequisicaoDeProva(id, "k", "modelo-x");
+      const req = montarRequisicaoDeProva(id, chaveDeTeste(id), "modelo-x");
       expect(req, id).not.toBeNull();
       expect(req!.url, `${id} está batendo num endpoint de catálogo`).not.toMatch(/\/models$/);
     }

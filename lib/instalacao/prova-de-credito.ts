@@ -21,8 +21,12 @@
 import { normalizarErro } from "@/lib/agent-engine/edge/llm/run-model-call";
 import {
   cabecalhosDeAtribuicaoOpenRouter,
+  CLOUDFLARE_API_ENDPOINT,
+  GROQ_ENDPOINT,
+  MISTRAL_ENDPOINT,
   OPENROUTER_ENDPOINT,
 } from "@/lib/agent-engine/edge/llm/providers";
+import { parseCloudflareAiCredential } from "@/lib/ai/cloudflare-credential";
 
 export type ResultadoDaProva =
   | { ok: true }
@@ -83,6 +87,27 @@ export function montarRequisicaoDeProva(
         },
         body: { model: modelo, max_tokens: 1, messages: msg },
       };
+    case "mistral":
+    case "groq": {
+      const endpoint = provider === "mistral" ? MISTRAL_ENDPOINT : GROQ_ENDPOINT;
+      return {
+        url: `${endpoint}/chat/completions`,
+        headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+        body: { model: modelo, max_tokens: 1, messages: msg },
+      };
+    }
+    case "cloudflare": {
+      const credential = parseCloudflareAiCredential(apiKey);
+      if (!credential) return null;
+      return {
+        url: `${CLOUDFLARE_API_ENDPOINT}/client/v4/accounts/${credential.accountId}/ai/v1/chat/completions`,
+        headers: {
+          authorization: `Bearer ${credential.apiToken}`,
+          "content-type": "application/json",
+        },
+        body: { model: modelo, max_tokens: 1, messages: msg },
+      };
+    }
     case "google":
       return {
         url: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(

@@ -42,6 +42,15 @@ o dispatcher **nativo** deste repo **para de tocar** os eventos daquela org — 
 Vendaval os consome. O resto do contrato (tools, RLS, proibições) continua valendo
 igual.
 
+### Porta operacional na interface
+
+Quem administra chega pelo caminho **Agentes → Conectar agente externo (MCP)**.
+A tela de tokens mostra o endpoint HTTPS da própria instalação (`/api/mcp`) e
+orienta a criar um bearer exclusivo da organização com o menor conjunto de
+scopes: `mcp:read` para leitura, `mcp:write` para ações e `role:manager` somente
+quando o runtime precisar criar ou atribuir registros. O segredo continua sendo
+mostrado uma única vez; a organização não é aceita no corpo da chamada.
+
 ---
 
 ## 1. Catálogo de tools (fonte única: `lib/mcp/tools/catalog.ts`)
