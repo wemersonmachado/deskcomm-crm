@@ -289,3 +289,4 @@ To re-apply on a fresh Supabase project, replay the migrations in version order 
 | `20260908220000` | `0233_nome_de_sessao_waha_curto` | O nome de sessão WAHA gerado em `fn_reserve_channel_connection` tinha 69 caracteres; medido em produção que o WAHA recusa acima de 54 — nenhuma conexão por QR Code chegava a existir. Encurtado para 41; backfill renomeia sessões antigas que nunca conectaram de verdade. |
 | `20260910020000` | `0234_propagacao_do_perfil_de_interface` | Troca o padrão visual e os vínculos que ainda o herdavam na mesma transação; configurações individuais divergentes são preservadas. |
 | `20260910110000` | `0235_provedores_llm_adicionais` | Catálogo publicável para Mistral, Groq e Cloudflare Workers AI; preços desconhecidos permanecem nulos, sem simular gratuidade. |
+| `20260910120000` | `0236_landing_page` | Conteúdo público editável da landing; coluna JSONB em platform_branding, sem alterar RLS. |

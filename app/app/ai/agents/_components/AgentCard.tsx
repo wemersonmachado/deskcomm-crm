@@ -60,8 +60,8 @@ export function AgentCard({ agent, canWrite }: Props) {
 
   return (
     <Card className="flex h-full flex-col gap-3 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-2">
+        <div className="min-w-0 w-full">
           <h3 className="truncate font-medium" title={agent.name}>
             {agent.name}
           </h3>
@@ -73,10 +73,10 @@ export function AgentCard({ agent, canWrite }: Props) {
                 : t("Modelo do cadastro; nenhuma versão publicada ainda.")
             }
           >
-            {modeloEmVigor(agent)}
+            {incomplete && agent.model === "pending" ? t("Modelo ainda não selecionado") : modeloEmVigor(agent)}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {agent.is_default && (
             <Badge variant="secondary" className="text-xs">
               {t("default")}

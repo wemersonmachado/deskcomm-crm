@@ -121,13 +121,13 @@ export function createDefaultRegistry(opts?: { allowedHosts?: string[] }): Provi
         apiKey,
         baseURL: MISTRAL_ENDPOINT,
         fetch: contain(MISTRAL_ENDPOINT),
-      })(modelId),
+      }).chat(modelId),
     groq: (apiKey, modelId) =>
       createOpenAI({
         apiKey,
         baseURL: GROQ_ENDPOINT,
         fetch: contain(GROQ_ENDPOINT),
-      })(modelId),
+      }).chat(modelId),
     cloudflare: (credential, modelId) => {
       const parsed = parseCloudflareAiCredential(credential);
       if (!parsed) throw new Error('cloudflare_credential_invalid');
@@ -136,7 +136,7 @@ export function createDefaultRegistry(opts?: { allowedHosts?: string[] }): Provi
         apiKey: parsed.apiToken,
         baseURL: endpoint,
         fetch: contain(endpoint),
-      })(modelId);
+      }).chat(modelId);
     },
   };
 }

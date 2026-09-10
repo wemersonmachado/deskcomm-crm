@@ -1,0 +1,27 @@
+"use client";
+import { useState, useTransition } from "react";
+import { saveLanding } from "./actions";
+import type { LandingConfig } from "./schema";
+
+const labels: Record<string, string> = { eyebrow: "Chamada inicial", title: "Título principal", subtitle: "Proposta de valor", cta_label: "Texto do botão", cta_url: "Destino do contato (HTTPS, por exemplo WhatsApp comercial)", pain_title: "Título do problema", pain_description: "Descrição do problema", benefits_title: "Título dos benefícios", steps_title: "Título do passo a passo", pricing_title: "Título dos planos", pricing_note: "Condições comerciais", closing_title: "Título final", closing_description: "Mensagem final" };
+const inputClass = "mt-1 w-full rounded-md border bg-background p-2 text-foreground";
+export function SettingsForm({ initial }: { initial: LandingConfig }) {
+  const [config, setConfig] = useState(initial);
+  const [status, setStatus] = useState("");
+  const [pending, start] = useTransition();
+  function field(label: string, value: string, change: (value: string) => void, multiline = false) {
+    return <label className="block text-sm" key={label}>{label}{multiline ? <textarea className={inputClass} value={value} maxLength={3000} rows={3} onChange={e => change(e.target.value)} /> : <input className={inputClass} value={value} maxLength={1000} onChange={e => change(e.target.value)} />}</label>;
+  }
+  return <form className="max-w-4xl space-y-6" onSubmit={e => { e.preventDefault(); start(async () => { try { const result = await saveLanding(config); setStatus(result.error ?? "Página publicada com as alterações salvas."); } catch { setStatus("Não foi possível salvar. Confira sua sessão e tente novamente."); } }); }}>
+    <p className="rounded-lg border p-4 text-sm">Esta página é pública e única para a instalação. Somente o superadministrador pode alterá-la. Os valores iniciais são demonstrativos; nenhuma cobrança é criada. Configure o destino do botão para seu canal comercial antes de divulgar.</p>
+    <fieldset disabled={pending} className="space-y-5 rounded-lg border p-5"><legend>Aparência e conteúdo</legend>
+      <label className="block text-sm">Tema<select className={inputClass} value={config.theme} onChange={e => setConfig({ ...config, theme: e.target.value as LandingConfig["theme"] })}><option value="dark">Escuro</option><option value="light">Claro</option></select></label>
+      <label className="block text-sm">Cor de destaque<input type="color" value={config.accent} onChange={e => setConfig({ ...config, accent: e.target.value })} className="ml-3" /></label>
+      {Object.entries(labels).map(([key, label]) => field(label, config[key as keyof LandingConfig] as string, value => setConfig({ ...config, [key]: value }), key.includes("description") || key === "subtitle"))}
+    </fieldset>
+    {(["benefits", "steps"] as const).map(kind => <fieldset disabled={pending} className="space-y-4 rounded-lg border p-5" key={kind}><legend>{kind === "benefits" ? "Cards de benefícios" : "Passo a passo"}</legend>{config[kind].map((card, index) => <div className="grid gap-3 border-b pb-4 md:grid-cols-2" key={index}>{field(`Título ${index + 1}`, card.title, value => setConfig({ ...config, [kind]: config[kind].map((c, i) => i === index ? { ...c, title: value } : c) }))}{field(`Descrição ${index + 1}`, card.description, value => setConfig({ ...config, [kind]: config[kind].map((c, i) => i === index ? { ...c, description: value } : c) }), true)}</div>)}</fieldset>)}
+    <fieldset disabled={pending} className="space-y-5 rounded-lg border p-5"><legend>Planos</legend>{config.plans.map((plan, index) => <div className="space-y-3 border-b pb-4" key={index}>{(["name", "price", "description"] as const).map(key => field(`${index + 1} · ${key === "name" ? "Nome" : key === "price" ? "Valor" : "Descrição"}`, plan[key], value => setConfig({ ...config, plans: config.plans.map((p, i) => i === index ? { ...p, [key]: value } : p) })))}{field(`${index + 1} · Recursos (um por linha)`, plan.features.join("\n"), value => setConfig({ ...config, plans: config.plans.map((p, i) => i === index ? { ...p, features: value.split("\n") } : p) }), true)}</div>)}</fieldset>
+    <fieldset disabled={pending} className="space-y-4 rounded-lg border p-5"><legend>Perguntas frequentes</legend>{config.faq.map((item, index) => <div key={index}>{field(`Pergunta ${index + 1}`, item.question, value => setConfig({ ...config, faq: config.faq.map((q, i) => i === index ? { ...q, question: value } : q) }))}{field(`Resposta ${index + 1}`, item.answer, value => setConfig({ ...config, faq: config.faq.map((q, i) => i === index ? { ...q, answer: value } : q) }), true)}</div>)}</fieldset>
+    <div className="sticky bottom-0 flex flex-wrap items-center gap-4 border-t bg-background p-4"><button disabled={pending} className="rounded-md bg-primary px-5 py-2 text-primary-foreground">{pending ? "Salvando…" : "Salvar e publicar"}</button><a href="/" target="_blank" rel="noopener noreferrer" className="underline">Ver página pública ↗</a><p role="status" className="text-sm">{status}</p></div>
+  </form>;
+}

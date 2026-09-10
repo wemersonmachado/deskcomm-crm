@@ -103,6 +103,15 @@ export const GRUPO_NO_RODAPE: NavGroupId = "organizacao";
  * fechada e por isso não vira `minRole`.
  */
 export const NAV_CATALOG = [
+  {
+    href: "/app/settings/landing-page",
+    label: "Página de apresentação",
+    description: "Conteúdo, cores e planos da página pública da instalação. Exclusivo do superadministrador.",
+    icon: "Storefront",
+    group: "organizacao",
+    section: "Sua empresa",
+    minRole: "admin",
+  },
   // ---- Atendimento — onde o operador passa o dia ----
   {
     href: "/app/inbox",

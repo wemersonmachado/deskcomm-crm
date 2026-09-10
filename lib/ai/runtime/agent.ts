@@ -184,16 +184,16 @@ export function buildModel(provider: string, apiKey: string, modelId: string): L
         headers: cabecalhosDeAtribuicaoOpenRouter(),
       })(modelId);
     case "mistral":
-      return createOpenAI({ apiKey, baseURL: "https://api.mistral.ai/v1" })(modelId);
+      return createOpenAI({ apiKey, baseURL: "https://api.mistral.ai/v1" }).chat(modelId);
     case "groq":
-      return createOpenAI({ apiKey, baseURL: "https://api.groq.com/openai/v1" })(modelId);
+      return createOpenAI({ apiKey, baseURL: "https://api.groq.com/openai/v1" }).chat(modelId);
     case "cloudflare": {
       const parsed = parseCloudflareAiCredential(apiKey);
       if (!parsed) throw new Error("cloudflare_credential_invalid");
       return createOpenAI({
         apiKey: parsed.apiToken,
         baseURL: `https://api.cloudflare.com/client/v4/accounts/${parsed.accountId}/ai/v1`,
-      })(modelId);
+      }).chat(modelId);
     }
     default:
       throw new Error(`unsupported_provider: ${provider}`);

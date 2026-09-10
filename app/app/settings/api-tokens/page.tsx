@@ -5,6 +5,9 @@ import { ROLE_RANK } from "@/lib/auth/types";
 import { ApiTokensClient } from "./_components/ApiTokensClient";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { Card } from "@/components/ui/card";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { readExternalConfiguration } from "@/lib/mcp/external-configuration";
+import { ExternalAgentForm } from "./_components/ExternalAgentForm";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +18,11 @@ export default async function ApiTokensPage() {
     redirect("/403");
   }
   const idioma = user.idioma;
+  const db = createAdminClient();
+  const [orgResult, agentsResult] = await Promise.all([
+    db.from("organizations").select("settings").eq("id", activeOrg.orgId).single(),
+    db.from("ai_agents").select("id, name").eq("organization_id", activeOrg.orgId).is("archived_at", null).not("published_version_id", "is", null).order("name"),
+  ]);
 
   return (
     <div className="flex h-full flex-col gap-6 p-6">
@@ -37,6 +45,7 @@ export default async function ApiTokensPage() {
         </p>
       </Card>
       <ApiTokensClient />
+      {orgResult.data && <ExternalAgentForm initial={readExternalConfiguration(orgResult.data.settings)} agents={agentsResult.data ?? []} />}
     </div>
   );
 }

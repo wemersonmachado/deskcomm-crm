@@ -6,7 +6,6 @@
  */
 
 import type { EventHandler } from "@/lib/event-log/dispatcher";
-import { processLgpdExport } from "@/workers/lgpd-export-worker";
 
 export const LGPD_EXPORT_HANDLER_KEY = "lgpd-export-worker.v1";
 
@@ -14,6 +13,9 @@ export const lgpdExportHandler: EventHandler = {
   key: LGPD_EXPORT_HANDLER_KEY,
   events: ["lgpd.data_request_received"],
   async handle(row) {
+    // O renderizador de PDF só é carregado quando há exportação. Sua falha não
+    // deve impedir que o dispatcher registre os demais consumidores.
+    const { processLgpdExport } = await import("@/workers/lgpd-export-worker");
     return processLgpdExport(row);
   },
 };

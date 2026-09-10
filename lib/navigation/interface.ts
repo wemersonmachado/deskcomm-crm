@@ -44,6 +44,7 @@ export function canSee(
   platform: boolean,
   role: Role | null,
 ): boolean {
+  if (d.href === "/app/settings/landing-page") return platform;
   return platform || (!!role && ROLE_RANK[role] >= ROLE_RANK[d.minRole ?? "viewer"]);
 }
 export function permitidos(platform: boolean, role: Role | null): NavMetadata[] {

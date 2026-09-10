@@ -7,6 +7,7 @@
  *                    +1 handoff (request_human_handoff). Total 13 tools.
  */
 import type { McpToolDefinition } from "../types";
+import { crmGetAgentConfiguration } from "./agent-configuration";
 import { TOOL_CATALOG, VALID_TOOL_IDS } from "./catalog";
 import { crmSearchContacts, crmGetContact, crmProposeContactField } from "./contacts";
 import {
@@ -88,6 +89,7 @@ import {
 // nivel do array — o server core ja recebe args como `Record<string,
 // unknown>` e cada handler valida no Zod do registerTool.
 export const allTools: ReadonlyArray<McpToolDefinition> = [
+  crmGetAgentConfiguration,
   // read
   crmListEventTypes,
   crmFindFreeSlots,
