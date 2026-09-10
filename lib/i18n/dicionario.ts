@@ -32,11 +32,13 @@
  * do que estava.
  */
 import type { Idioma } from "./idiomas";
+import { INTEGRACAO_EXTERNA_ES } from "./integracao-externa";
 
 /** `pt-BR` não aparece: é a chave. Só o que DIFERE precisa de linha. */
 type Traducoes = Record<string, Partial<Record<Exclude<Idioma, "pt-BR">, string>>>;
 
 export const DICIONARIO: Traducoes = {
+  ...INTEGRACAO_EXTERNA_ES,
   "Administração da organização": { es: "Administración de la organización" },
   "Interface padrão da organização": { es: "Interfaz predeterminada de la organización" },
   "Este padrão inicia novos convites. As configurações individuais e os convites já emitidos são preservados.": { es: "Este valor inicia nuevas invitaciones. Se conservan las configuraciones individuales y las invitaciones ya emitidas." },

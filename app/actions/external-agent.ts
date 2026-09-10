@@ -22,7 +22,7 @@ export async function saveExternalAgentConfiguration(input: unknown) {
   const settings = { ...(previous as Record<string, unknown>), ai_dispatch_mode: value.dispatch_mode, external_agent: { configuration_source: value.configuration_source, agent_id: value.configuration_source === "platform" ? value.agent_id : null } };
   // Compare-and-swap preserva alterações concorrentes de marca/interface e outros campos.
   const query = db.from("organizations").update({ settings: settings as never }).eq("id", auth.org.orgId);
-  const { data: updated, error } = await (org.settings === null ? query.is("settings", null) : query.eq("settings", previous)).select("id").maybeSingle();
+  const { data: updated, error } = await (org.settings === null ? query.is("settings", null) : query.eq("settings", JSON.stringify(previous))).select("id").maybeSingle();
   if (error || !updated) return { error: "Não foi possível salvar ou a organização mudou em outra tela. Recarregue e tente novamente." };
   await audit({ action: "org.updated", actorUserId: auth.user.id, organizationId: auth.org.orgId, resourceType: "organizations", resourceId: auth.org.orgId, metadata: { area: "external_agent", ...value } });
   revalidatePath("/app/settings/api-tokens");
