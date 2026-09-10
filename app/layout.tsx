@@ -26,14 +26,16 @@ import { PublicEnvScript } from "./public-env-script";
 import "./globals.css";
 
 const atkinson = Atkinson_Hyperlegible({
-  subsets: ["latin", "latin-ext"],
+  // Pré-carrega só o subconjunto usado por PT/ES. Outros continuam disponíveis
+  // via unicode-range, sem disputar a rede inicial em todas as páginas.
+  subsets: ["latin"],
   weight: ["400", "700"],
   display: "swap",
   variable: "--font-atkinson",
 });
 
 const plexMono = IBM_Plex_Mono({
-  subsets: ["latin", "latin-ext"],
+  subsets: ["latin"],
   weight: ["400", "500"],
   display: "swap",
   variable: "--font-mono",
