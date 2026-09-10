@@ -26,6 +26,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   let activeOrg = await resolveActiveOrg(user);
 
+  // Apagar uma organização remove seus vínculos por cascade, mas NÃO apaga a
+  // identidade no Supabase Auth. Sem este gate a sessão antiga ainda montava a
+  // casca de /app e deixava a pessoa chegar ao Perfil, embora ela não tivesse
+  // mais organização nem dados autorizados. Platform admin conserva a saída
+  // legítima pelo painel; os demais recebem uma página sem casca e podem sair.
+  if (!activeOrg) {
+    if (user.is_platform_admin && !user.support) redirect("/admin");
+    redirect("/access-revoked");
+  }
+
   /**
    * A cor desta organização, serializada, ou `null` quando ela não tem uma.
    *

@@ -73,8 +73,11 @@ export default async function TenantSettingsPage() {
             dpo_email: row.dpo_email,
             privacy_policy_url: row.privacy_policy_url,
             lost_reasons_extra: lostReasonsExtra,
+            apply_interface_default_to_active_members: true,
             ...(user.is_platform_admin
-              ? { interface_default: lerInterface(row.settings?.interface_default).settings }
+              ? {
+                  interface_default: lerInterface(row.settings?.interface_default).settings,
+                }
               : {}),
           }}
         />

@@ -37,9 +37,9 @@ import { tenantSchema } from "@/lib/schemas/settings";
 
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
 
-/** O que a action mandou para o UPDATE — é sobre isto que as asserções falam. */
+/** O que a action mandou para a transação de atualização — é sobre isto que as asserções falam. */
 let atualizado: Record<string, unknown> | null = null;
-/** O org id que o `.eq()` do UPDATE recebeu — admin client bypassa RLS, então este `.eq()` É a única cerca. */
+/** O org id que a transação recebeu — admin client bypassa RLS, então esta cerca é obrigatória. */
 let orgIdAtualizado: string | null = null;
 
 function adminFalso() {
@@ -48,17 +48,15 @@ function adminFalso() {
       select: () => ({
         eq: () => ({ maybeSingle: async () => ({ data: { settings: {} }, error: null }) }),
       }),
-      update: (linha: Record<string, unknown>) => {
-        atualizado = linha;
-        return {
-          eq: async (_coluna: string, valor: string) => {
-            orgIdAtualizado = valor;
-            return { error: null };
-          },
-        };
-      },
     }),
-    rpc: () => Promise.resolve({ error: null }),
+    rpc: (name: string, params: Record<string, unknown>) => {
+      if (name === "fn_update_organization_with_interface_default") {
+        atualizado = params;
+        orgIdAtualizado = params.p_organization_id as string;
+        return Promise.resolve({ data: { members_updated: 0 }, error: null });
+      }
+      return Promise.resolve({ error: null });
+    },
   };
 }
 
@@ -102,12 +100,10 @@ describe("a moeda da organização", () => {
     expect(r).toEqual({ ok: true });
     // ⚠️ MXN e não BRL: com o padrão chumbado este caso passaria verde e a
     // escolha da tela seria decorativa.
-    expect(atualizado).toMatchObject({ currency: "MXN" });
+    expect(atualizado).toMatchObject({ p_currency: "MXN" });
     // ⚠️ O admin client BYPASSA RLS por desenho (única policy de escrita de
-    // `organizations` é `orgs_write_platform_admin`) — o `.eq("id", orgId)`
-    // é a ÚNICA cerca entre "salvei a moeda da minha org" e "salvei a moeda
-    // de toda organização da instalação". Um `.eq()` esquecido escreveria em
-    // todo mundo e este teste continuaria verde sem esta linha.
+    // A função é service-role-only, mas o id ainda é a única cerca entre
+    // "salvei a moeda da minha org" e "salvei a moeda de toda a instalação".
     expect(orgIdAtualizado).toBe(ORG_ID);
   });
 

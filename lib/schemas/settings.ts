@@ -86,6 +86,8 @@ export const tenantSchema = z.object({
   interface_default: interfaceSettingsSchema
     .refine((value) => interfaceTemDestino(value, "admin"))
     .optional(),
+  /** Atualiza somente vínculos que ainda usam o padrão anterior da organização. */
+  apply_interface_default_to_active_members: z.boolean().optional().default(true),
   display_name: z.string().min(1).max(120),
   legal_name: z.string().min(1).max(200),
   cnpj: z

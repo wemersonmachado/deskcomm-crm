@@ -525,6 +525,9 @@ export const DICIONARIO: Traducoes = {
   "Informações pessoais. Email só pode ser trocado em breve.": {
     es: "Información personal. El email solo se puede cambiar próximamente.",
   },
+  "Informações pessoais. Gerencie senha e e-mail em Segurança.": {
+    es: "Información personal. Administra la contraseña y el correo en Seguridad.",
+  },
   "Dados da empresa, retenção de mídia, DPO. Admin only.": {
     es: "Datos de la empresa, retención de medios, DPO. Solo administradores.",
   },

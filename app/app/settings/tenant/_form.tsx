@@ -1,5 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
 import { InterfaceEditor } from "@/components/team/InterfaceEditor";
@@ -35,6 +36,7 @@ const TIMEZONES = [
 
 export function TenantForm({ initial }: Props) {
   const t = useT();
+  const router = useRouter();
   const [form, setForm] = useState<TenantInput>(initial);
   const [reasonsText, setReasonsText] = useState((initial.lost_reasons_extra ?? []).join(", "));
   const [isPending, startTransition] = useTransition();
@@ -57,7 +59,10 @@ export function TenantForm({ initial }: Props) {
     }
     startTransition(async () => {
       const r = await updateTenant(parsed.data);
-      if (r.ok) toast.success(t("Organização atualizada."));
+      if (r.ok) {
+        router.refresh();
+        toast.success(t("Organização atualizada."));
+      }
       else toast.error(`${t("Erro")}: ${r.error}`);
     });
   }
@@ -70,7 +75,7 @@ export function TenantForm({ initial }: Props) {
             <h2 className="font-semibold">{t("Interface padrão da organização")}</h2>
             <p className="text-sm text-muted-foreground">
               {t(
-                "Este padrão inicia novos convites. As configurações individuais e os convites já emitidos são preservados.",
+                "Ao salvar, o novo perfil alcança membros que ainda usam o padrão anterior. Configurações individuais diferentes e convites já emitidos são preservados.",
               )}
             </p>
             <InterfaceEditor
@@ -79,6 +84,16 @@ export function TenantForm({ initial }: Props) {
               role="admin"
               disabled={isPending}
             />
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.apply_interface_default_to_active_members}
+                onChange={(event) => set("apply_interface_default_to_active_members", event.target.checked)}
+                disabled={isPending}
+                className="mt-1"
+              />
+              <span>{t("Aplicar também aos membros que usam o perfil padrão atual")}</span>
+            </label>
             <Link href="/app/team" className="text-sm underline">
               {t("Configurar a interface de cada membro em Equipe")}
             </Link>
