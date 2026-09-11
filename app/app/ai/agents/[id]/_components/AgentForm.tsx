@@ -1064,6 +1064,8 @@ export function AgentForm(props: Props) {
               </div>
             </div>
             <Textarea
+              data-testid="agent-system-prompt"
+              aria-label={t("Instruções do agente")}
               value={form.system_prompt}
               onChange={(e) => patch({ system_prompt: e.target.value })}
               disabled={disabled}

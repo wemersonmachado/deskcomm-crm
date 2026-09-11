@@ -65,9 +65,8 @@ export async function validateExternalMcpFlow(page: Page, db: SupabaseClient, ba
     await expect(page.getByText("Externo via MCP", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Editar", exact: true }).click();
     await page.locator("#name").fill(name);
-    // O prompt é um textarea sem id: use o controle real, não um seletor
-    // inventado, para que esta prova cubra o mesmo campo que o usuário edita.
-    const promptField = page.locator("textarea").first();
+    // Campo semântico próprio; há outro textarea para a descrição do agente.
+    const promptField = page.getByTestId("agent-system-prompt");
     await promptField.fill(prompt);
     await page.getByRole("button", { name: "Salvar rascunho", exact: true }).click();
     await expect.poll(async () => {
