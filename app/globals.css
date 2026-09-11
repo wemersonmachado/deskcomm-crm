@@ -11,6 +11,7 @@
 @source "../components";
 @source "../lib";
 @source "../hooks";
+@source "../landing-page";
 
 /* Escuro por atributo, não por classe. Equivale ao `darkMode: ["class",
    "[data-theme='dark']"]` do v3: a forma de duas casas do v3 NÃO acumula com

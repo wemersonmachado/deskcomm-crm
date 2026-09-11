@@ -210,6 +210,16 @@ const PROVA_PROPRIA: readonly Excecao[] = [
       "da organização viraram venda, e quem o lê é o servidor com o admin client " +
       "filtrando organization_id à mão (a tela `/app/settings/conversoes`).",
   },
+  {
+    tabela: "organization_subscriptions",
+    razao:
+      "tests/invariants/billing-access-rls.test.ts — tabela financeira server-only: anon/authenticated sem privilégio, SELECT negado e RLS ligada; service_role mantém o acesso do webhook de cobrança.",
+  },
+  {
+    tabela: "platform_checkout_access",
+    razao:
+      "tests/invariants/billing-access-rls.test.ts — recibo de pagamento server-only: e-mail fica somente em hash, anon/authenticated sem privilégio e RLS ligada; service_role processa a retentativa.",
+  },
 ];
 
 /**

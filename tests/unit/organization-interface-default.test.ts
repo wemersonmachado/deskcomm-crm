@@ -22,8 +22,8 @@ const input = tenantSchema.parse({
   interface_default: { preset: "simplificada", destinos: ["/app/ai/agents"] },
 });
 const saved = { branding: { name: "Marca" }, interface_default: { preset: "completa" } };
-const update = vi.fn();
 const from = vi.fn();
+const rpc = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(requirePlatformAdmin).mockResolvedValue({
@@ -32,12 +32,7 @@ beforeEach(() => {
   } as never);
   vi.mocked(loadAuthUser).mockResolvedValue({ id: "super", is_platform_admin: true } as never);
   vi.mocked(resolveActiveOrg).mockResolvedValue({ orgId: "org-b", role: "admin" } as never);
-  update.mockReturnValue({
-    eq: vi.fn(async (column, id) => {
-      expect([column, id]).toEqual(["id", "org-b"]);
-      return { error: null };
-    }),
-  });
+  rpc.mockResolvedValue({ data: { members_updated: 1 }, error: null });
   from.mockImplementation((table) => {
     expect(table).toBe("organizations"); // Nunca escreve nos vínculos individuais.
     return {
@@ -47,12 +42,11 @@ beforeEach(() => {
           return { maybeSingle: async () => ({ data: { settings: saved }, error: null }) };
         },
       }),
-      update,
     };
   });
   vi.mocked(createAdminClient).mockReturnValue({
     from,
-    rpc: () => Promise.resolve({ error: null }),
+    rpc,
   } as never);
 });
 describe("padrão organizacional preserva indivíduos", () => {
@@ -64,11 +58,14 @@ describe("padrão organizacional preserva indivíduos", () => {
     expect(await updateTenant(input)).toMatchObject({ ok: false, error: "forbidden_role" });
     expect(from).not.toHaveBeenCalled();
   });
-  it("grava apenas padrão e preserva marca, sem atualizar memberships", async () => {
+  it("troca padrão e propaga só os vínculos que ainda o herdavam", async () => {
     expect(await updateTenant(input)).toEqual({ ok: true });
-    expect(update).toHaveBeenCalledWith(
+    expect(rpc).toHaveBeenCalledWith(
+      "fn_update_organization_with_interface_default",
       expect.objectContaining({
-        settings: { ...saved, lost_reasons_extra: [], interface_default: input.interface_default },
+        p_organization_id: "org-b",
+        p_settings: { ...saved, lost_reasons_extra: [], interface_default: input.interface_default },
+        p_propagate_interface_default: true,
       }),
     );
     expect(audit).toHaveBeenCalledWith(
@@ -92,8 +89,12 @@ describe("padrão organizacional preserva indivíduos", () => {
   it("campo omitido preserva padrão existente", async () => {
     const { interface_default: _ignored, ...ordinary } = input;
     expect(await updateTenant(ordinary)).toEqual({ ok: true });
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ settings: { ...saved, lost_reasons_extra: [] } }),
+    expect(rpc).toHaveBeenCalledWith(
+      "fn_update_organization_with_interface_default",
+      expect.objectContaining({
+        p_settings: { ...saved, lost_reasons_extra: [] },
+        p_propagate_interface_default: false,
+      }),
     );
   });
   it("recusa áreas desconhecidas ou sem destino operacional", async () => {

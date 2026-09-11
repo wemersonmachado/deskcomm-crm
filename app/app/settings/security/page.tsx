@@ -55,6 +55,7 @@ export default async function SecurityPage() {
         obrigatorio={obrigatorio}
         podeExigirDaEquipe={org?.role === "admin"}
         empresaExige={empresaExige}
+        email={user.email ?? ""}
       />
     </div>
   );

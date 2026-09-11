@@ -46,7 +46,7 @@ test.describe("Criar um agente pela tela", () => {
     await expect(page.getByRole("heading", { name: /novo agent/i })).toBeVisible();
 
     // O botão nasce bloqueado: a tela não deixa criar um agente pela metade.
-    const criar = page.getByRole("button", { name: /criar agent/i });
+    const criar = page.getByRole("button", { name: /concluir configura/i });
     await expect(criar).toBeDisabled();
 
     // E ela diz o que falta — as três exigências que o servidor também impõe.
@@ -59,6 +59,18 @@ test.describe("Criar um agente pela tela", () => {
     ]) {
       await expect(page.getByText(exigencia).first()).toBeVisible();
     }
+
+    // O que a pessoa já digitou deixa de morar só no navegador. Depois do
+    // indicador de salvamento, sair e reabrir /new recupera o mesmo registro.
+    const nomeParcial = `Rascunho persistente ${Date.now()}`;
+    await page.locator("#name").fill(nomeParcial);
+    await expect(page.getByText(/salvando rascunho/i).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/rascunho salvo/i).first()).toBeVisible({ timeout: 15_000 });
+    await page.goto("/app/ai/agents");
+    await expect(page.getByText(nomeParcial).first()).toBeVisible();
+    await expect(page.getByText(/configuração incompleta/i).first()).toBeVisible();
+    await page.goto("/app/ai/agents/new");
+    await expect(page.locator("#name")).toHaveValue(nomeParcial);
 
     await page.screenshot({
       path: path.join(EVIDENCIA, "w1-nova-01-tela-de-criar.png"),
@@ -105,12 +117,12 @@ test.describe("Criar um agente pela tela", () => {
       fullPage: true,
     });
 
-    const criar = page.getByRole("button", { name: /criar agent/i });
+    const criar = page.getByRole("button", { name: /concluir configura/i });
     await expect(criar).toBeEnabled();
     await criar.click();
 
-    // Nasceu: a tela navega para o agente criado.
-    await page.waitForURL(/\/app\/ai\/agents\/[0-9a-f-]{36}/, { timeout: 30_000 });
+    // A configuração inicial foi concluída no mesmo agente persistente.
+    await expect(page.getByText(/rascunho v1/i).first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(nome).first()).toBeVisible();
 
     // E as capacidades que liguei ANTES de criar sobreviveram ao nascimento —

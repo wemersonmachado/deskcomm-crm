@@ -55,11 +55,13 @@ export function modeloEmVigor(agent: AgentRow): string {
 export function AgentCard({ agent, canWrite }: Props) {
   const t = useT();
   const status = deriveAgentStatus(agent);
+  const incomplete =
+    (agent.config?.creation_draft as { state?: unknown } | undefined)?.state === "incomplete";
 
   return (
     <Card className="flex h-full flex-col gap-3 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-2">
+        <div className="min-w-0 w-full">
           <h3 className="truncate font-medium" title={agent.name}>
             {agent.name}
           </h3>
@@ -71,21 +73,27 @@ export function AgentCard({ agent, canWrite }: Props) {
                 : t("Modelo do cadastro; nenhuma versão publicada ainda.")
             }
           >
-            {modeloEmVigor(agent)}
+            {incomplete && agent.model === "pending" ? t("Modelo ainda não selecionado") : modeloEmVigor(agent)}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {agent.is_default && (
             <Badge variant="secondary" className="text-xs">
               {t("default")}
             </Badge>
           )}
           <AgentStatusBadge status={status} />
+          {incomplete && <Badge variant="outline">{t("Configuração incompleta")}</Badge>}
           {canWrite && <AgentRowMenu agent={agent} />}
         </div>
       </div>
       {agent.description && (
         <p className="line-clamp-2 text-xs text-muted-foreground">{agent.description}</p>
+      )}
+      {incomplete && (
+        <p className="text-xs text-amber-700 dark:text-amber-300">
+          {t("Seu progresso foi salvo. Abra o rascunho para concluir ou use o menu para apagá-lo.")}
+        </p>
       )}
       <dl className="grid grid-cols-2 gap-2 pt-1 text-xs">
         <div>

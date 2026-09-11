@@ -98,7 +98,6 @@ begin
   return v_event_id;
 end $$;
 
-
 ALTER FUNCTION "public"."emit_event"("p_event_type" "text", "p_entity_kind" "text", "p_entity_id" "uuid", "p_payload" "jsonb", "p_metadata" "jsonb", "p_organization_id" "uuid") OWNER TO "postgres";
 
 
@@ -533,7 +532,6 @@ begin
     p_organization_id
   );
 end $$;
-
 
 ALTER FUNCTION "public"."fn_log_event"("p_organization_id" "uuid", "p_event_type" "text", "p_payload" "jsonb") OWNER TO "postgres";
 
@@ -23264,6 +23262,63 @@ begin
   end loop;
 end $$;
 
+-- ---- Propagação segura do perfil da organização (migration 0234) ----
+create or replace function public.fn_update_organization_with_interface_default(
+  p_organization_id uuid,
+  p_display_name text,
+  p_legal_name text,
+  p_cnpj text,
+  p_timezone text,
+  p_locale text,
+  p_currency text,
+  p_media_retention_days integer,
+  p_dpo_email text,
+  p_privacy_policy_url text,
+  p_settings jsonb,
+  p_propagate_interface_default boolean
+) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  previous_settings jsonb;
+  previous_default jsonb;
+  members_updated integer := 0;
+begin
+  select settings into previous_settings
+    from public.organizations where id = p_organization_id for update;
+  if not found then raise exception 'organization_not_found' using errcode = 'P0002'; end if;
+
+  previous_default := coalesce(previous_settings->'interface_default', '{"preset":"completa"}'::jsonb);
+  update public.organizations set
+    display_name = p_display_name,
+    legal_name = p_legal_name,
+    cnpj = p_cnpj,
+    timezone = p_timezone,
+    locale = p_locale,
+    currency = p_currency,
+    media_retention_days = p_media_retention_days,
+    dpo_email = p_dpo_email,
+    privacy_policy_url = p_privacy_policy_url,
+    settings = p_settings
+  where id = p_organization_id;
+
+  if p_propagate_interface_default
+    and p_settings ? 'interface_default'
+    and previous_default is distinct from p_settings->'interface_default' then
+    update public.user_organizations
+       set interface_settings = p_settings->'interface_default'
+     where organization_id = p_organization_id
+       and revoked_at is null
+       and accepted_at is not null
+       and interface_settings = previous_default;
+    get diagnostics members_updated = row_count;
+  end if;
+
+  return jsonb_build_object('members_updated', members_updated);
+end;
+$$;
+revoke all on function public.fn_update_organization_with_interface_default(uuid,text,text,text,text,text,text,integer,text,text,jsonb,boolean) from public, anon, authenticated;
+grant execute on function public.fn_update_organization_with_interface_default(uuid,text,text,text,text,text,text,integer,text,text,jsonb,boolean) to service_role;
+
 -- regra 2 (authenticated): as 5 que o update abriu e o install não abre. Aqui não
 -- cabe varredura — `authenticated` PRECISA de EXECUTE nos helpers de RLS e em
 -- `retrieve_top_k_chunks` (num install fresco ele tem). É julgamento por função,
@@ -23425,6 +23480,321 @@ update public.channel_sessions
 set waha_session_name='org_'||left(replace(organization_id::text,'-',''),16)||'_'||left(replace(gen_random_uuid()::text,'-',''),20),
     updated_at=now()
 where provider='waha' and length(waha_session_name)>54 and phone_number is null and status<>'WORKING';
+
+-- BEGIN 0235_provedores_llm_adicionais
+-- 0235 — provedores adicionais no editor de agentes
+--
+-- O runtime e a tela passam a oferecer Mistral, Groq e Cloudflare Workers AI.
+-- O catálogo precisa conhecer ao menos os modelos canônicos para que a função
+-- de publicação não recuse com model_not_found. Preço desconhecido fica NULL:
+-- zero significaria, falsamente, que o uso é grátis.
+insert into public.ai_models
+  (provider, model_id, display_name, description, context_window,
+   input_price_per_million_cents, output_price_per_million_cents,
+   supports_tools, is_default_for_provider)
+values
+  ('mistral', 'mistral-small-latest', 'Mistral Small (latest)',
+   'Modelo rápido e econômico da Mistral para atendimento.', null, null, null, true, true),
+  ('mistral', 'mistral-large-latest', 'Mistral Large (latest)',
+   'Modelo de maior capacidade da Mistral.', null, null, null, true, false),
+  ('groq', 'openai/gpt-oss-20b', 'GPT-OSS 20B na Groq',
+   'Modelo aberto rápido para tarefas de atendimento.', 131072, 8, 30, true, true),
+  ('groq', 'openai/gpt-oss-120b', 'GPT-OSS 120B na Groq',
+   'Modelo aberto de maior capacidade servido pela Groq.', 131072, 15, 60, true, false),
+  ('cloudflare', '@cf/openai/gpt-oss-20b', 'GPT-OSS 20B no Workers AI',
+   'Modelo aberto executado na rede da Cloudflare.', null, null, null, true, true),
+  ('cloudflare', '@cf/openai/gpt-oss-120b', 'GPT-OSS 120B no Workers AI',
+   'Modelo aberto de maior capacidade no Workers AI.', null, null, null, true, false)
+on conflict (provider, model_id) do update set
+  display_name = excluded.display_name,
+  description = excluded.description,
+  context_window = excluded.context_window,
+  input_price_per_million_cents = excluded.input_price_per_million_cents,
+  output_price_per_million_cents = excluded.output_price_per_million_cents,
+  supports_tools = excluded.supports_tools;
+
+update public.ai_models
+   set is_default_for_provider = false
+ where provider in ('mistral', 'groq', 'cloudflare')
+   and is_default_for_provider;
+
+update public.ai_models
+   set is_default_for_provider = true
+ where (provider = 'mistral' and model_id = 'mistral-small-latest')
+    or (provider = 'groq' and model_id = 'openai/gpt-oss-20b')
+    or (provider = 'cloudflare' and model_id = '@cf/openai/gpt-oss-20b');
+
+insert into public.ai_pricing
+  (model, prompt_cents_per_million_tokens, completion_cents_per_million_tokens, notes)
+values
+  ('openai/gpt-oss-20b', 8, 30, 'Groq; conferido no catálogo oficial em 2026-09-10'),
+  ('openai/gpt-oss-120b', 15, 60, 'Groq; conferido no catálogo oficial em 2026-09-10')
+on conflict (model) do update set
+  prompt_cents_per_million_tokens = excluded.prompt_cents_per_million_tokens,
+  completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,
+  notes = excluded.notes,
+  superseded_at = null;
+-- END 0235_provedores_llm_adicionais
+
+-- BEGIN 0236_landing_page
+-- Configuração pública não contém segredos. Escrita segue o guard de plataforma.
+alter table public.platform_branding
+  add column if not exists landing_page jsonb not null default '{}'::jsonb;
+-- END 0236_landing_page
+
+-- BEGIN 0237_billing_asaas_e_exclusoes_definitivas
+create table if not exists public.platform_billing_plans (slug text primary key check(slug in ('standard','pro','enterprise')),name text not null check(char_length(name) between 1 and 80),price_cents integer not null check(price_cents>0),currency text not null default 'BRL' check(currency='BRL'),billing_cycle text not null default 'MONTHLY' check(billing_cycle='MONTHLY'),asaas_payment_link_id text unique,checkout_url text,active boolean not null default true,synced_at timestamptz,sync_error text,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
+create table if not exists public.platform_payment_events (event_id text primary key,event_type text not null,provider_payment_id text,provider_customer_id text,payment_link_id text,plan_slug text references public.platform_billing_plans(slug) on delete set null,value_cents integer check(value_cents is null or value_cents>=0),status text,occurred_at timestamptz,payload_minimized jsonb not null default '{}'::jsonb,processed_at timestamptz not null default now(),created_at timestamptz not null default now());
+create table if not exists public.organization_subscriptions (organization_id uuid primary key references public.organizations(id) on delete cascade,plan_slug text not null references public.platform_billing_plans(slug),provider_customer_id text,provider_subscription_id text,provider_payment_id text,status text not null default 'pending',value_cents integer not null check(value_cents>=0),current_period_end timestamptz,created_at timestamptz not null default now(),updated_at timestamptz not null default now());
+alter table public.platform_billing_plans enable row level security; alter table public.platform_payment_events enable row level security; alter table public.organization_subscriptions enable row level security;
+revoke all on public.platform_billing_plans,public.platform_payment_events,public.organization_subscriptions from public,anon,authenticated;
+grant select,insert,update,delete on public.platform_billing_plans,public.platform_payment_events,public.organization_subscriptions to service_role;
+insert into public.platform_billing_plans(slug,name,price_cents) values('standard','Standard',19700),('pro','Pro',49700),('enterprise','Enterprise',99700) on conflict(slug) do nothing;
+alter table public.ai_agent_runs drop constraint if exists ai_agent_runs_agent_id_fkey;
+alter table public.ai_agent_runs add constraint ai_agent_runs_agent_id_fkey foreign key(agent_id) references public.ai_agents(id) on delete cascade;
+create or replace function public.fn_delete_contacts_bulk(
+  p_organization_id uuid,
+  p_contact_ids uuid[] default null
+) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_ids uuid[];
+  v_messages integer := 0;
+  v_conversations integer := 0;
+  v_contacts integer := 0;
+begin
+  select coalesce(array_agg(c.id), '{}'::uuid[]) into v_ids
+  from public.contacts c
+  where c.organization_id = p_organization_id
+    and (p_contact_ids is null or c.id = any(p_contact_ids));
+
+  if cardinality(v_ids) = 0 then
+    return jsonb_build_object('contacts',0,'conversations',0,'messages',0);
+  end if;
+
+  delete from public.messages m
+   where m.organization_id = p_organization_id and m.contact_id = any(v_ids);
+  get diagnostics v_messages = row_count;
+
+  delete from public.conversations c
+   where c.organization_id = p_organization_id and c.contact_id = any(v_ids);
+  get diagnostics v_conversations = row_count;
+
+  delete from public.contacts c
+   where c.organization_id = p_organization_id and c.id = any(v_ids);
+  get diagnostics v_contacts = row_count;
+
+  return jsonb_build_object('contacts',v_contacts,'conversations',v_conversations,'messages',v_messages);
+end;
+$$;
+revoke all on function public.fn_delete_contacts_bulk(uuid,uuid[]) from public,anon,authenticated; grant execute on function public.fn_delete_contacts_bulk(uuid,uuid[]) to service_role;
+create or replace function public.fn_delete_ai_agent_definitive(
+  p_organization_id uuid,
+  p_agent_id uuid
+) returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_deleted integer := 0;
+begin
+  update public.organizations
+     set settings = jsonb_set(
+       coalesce(settings, '{}'::jsonb),
+       '{external_agent}',
+       coalesce(settings->'external_agent','{}'::jsonb) - 'agent_id',
+       true
+     )
+   where id = p_organization_id
+     and settings->'external_agent'->>'agent_id' = p_agent_id::text;
+
+  delete from public.ai_agents
+   where id = p_agent_id and organization_id = p_organization_id and not is_default;
+  get diagnostics v_deleted = row_count;
+  return v_deleted = 1;
+end;
+$$;
+revoke all on function public.fn_delete_ai_agent_definitive(uuid,uuid) from public,anon,authenticated; grant execute on function public.fn_delete_ai_agent_definitive(uuid,uuid) to service_role;
+create or replace function public.fn_record_asaas_event(
+  p_event_id text,
+  p_event_type text,
+  p_payment_id text,
+  p_customer_id text,
+  p_payment_link_id text,
+  p_value_cents integer,
+  p_status text,
+  p_occurred_at timestamptz,
+  p_payload_minimized jsonb
+) returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_plan text;
+begin
+  select slug into v_plan from public.platform_billing_plans where asaas_payment_link_id = p_payment_link_id;
+  insert into public.platform_payment_events(event_id,event_type,provider_payment_id,provider_customer_id,payment_link_id,plan_slug,value_cents,status,occurred_at,payload_minimized)
+  values(p_event_id,p_event_type,p_payment_id,p_customer_id,p_payment_link_id,v_plan,p_value_cents,p_status,p_occurred_at,coalesce(p_payload_minimized,'{}'::jsonb))
+  on conflict(event_id) do nothing;
+  return found;
+end;
+$$;
+revoke all on function public.fn_record_asaas_event(text,text,text,text,text,integer,text,timestamptz,jsonb) from public,anon,authenticated; grant execute on function public.fn_record_asaas_event(text,text,text,text,text,integer,text,timestamptz,jsonb) to service_role;
+notify pgrst,'reload schema';
+-- END 0237_billing_asaas_e_exclusoes_definitivas
+
+-- BEGIN 0238_acesso_apos_pagamento
+create table if not exists public.platform_checkout_access (
+  purchase_key text primary key,
+  provider_payment_id text not null,
+  provider_subscription_id text,
+  provider_customer_id text not null,
+  organization_id uuid not null unique references public.organizations(id) on delete cascade,
+  invite_id uuid not null unique,
+  issued_at bigint not null,
+  email_hash text not null check (email_hash ~ '^[0-9a-f]{64}$'),
+  email_sent_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.platform_checkout_access enable row level security;
+revoke all on public.platform_checkout_access from public, anon, authenticated;
+grant select, insert, update, delete on public.platform_checkout_access to service_role;
+
+create or replace function public.fn_provision_paid_checkout(
+  p_payment_id text,
+  p_subscription_id text,
+  p_customer_id text,
+  p_payment_link_id text,
+  p_value_cents integer,
+  p_customer_name text,
+  p_email_hash text
+) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_purchase_key text := coalesce(nullif(p_subscription_id, ''), 'payment:' || p_payment_id);
+  v_plan public.platform_billing_plans%rowtype;
+  v_access public.platform_checkout_access%rowtype;
+  v_org public.organizations%rowtype;
+begin
+  if p_payment_id is null or p_customer_id is null or p_payment_link_id is null
+    or p_value_cents is null or p_customer_name is null or p_email_hash is null then
+    return jsonb_build_object('eligible', false, 'reason', 'missing_required_data');
+  end if;
+  if p_email_hash !~ '^[0-9a-f]{64}$' then
+    return jsonb_build_object('eligible', false, 'reason', 'invalid_email_hash');
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended('paid-checkout:' || v_purchase_key, 0));
+  select * into v_access from public.platform_checkout_access where purchase_key = v_purchase_key;
+  if found then
+    select display_name into v_org.display_name from public.organizations where id = v_access.organization_id;
+    select name into v_plan.name
+      from public.organization_subscriptions s
+      join public.platform_billing_plans p on p.slug = s.plan_slug
+      where s.organization_id = v_access.organization_id;
+    return jsonb_build_object(
+      'eligible', true, 'created', false,
+      'organization_id', v_access.organization_id,
+      'organization_name', v_org.display_name,
+      'plan_name', v_plan.name,
+      'invite_id', v_access.invite_id,
+      'issued_at', v_access.issued_at,
+      'email_sent_at', v_access.email_sent_at
+    );
+  end if;
+
+  select * into v_plan from public.platform_billing_plans
+    where asaas_payment_link_id = p_payment_link_id and active;
+  if not found then
+    return jsonb_build_object('eligible', false, 'reason', 'unknown_or_inactive_payment_link');
+  end if;
+  if v_plan.price_cents <> p_value_cents then
+    return jsonb_build_object('eligible', false, 'reason', 'payment_value_mismatch');
+  end if;
+
+  insert into public.organizations(display_name, slug, legal_name, status, settings, created_by)
+  values (
+    left(trim(p_customer_name), 120),
+    'xgo-' || substr(md5(p_customer_id || ':' || v_purchase_key), 1, 24),
+    left(trim(p_customer_name), 255),
+    'active',
+    jsonb_build_object(
+      'plan', v_plan.slug,
+      'interface_default', jsonb_build_object('preset', 'completa')
+    ),
+    null
+  ) returning * into v_org;
+
+  insert into public.organization_subscriptions(
+    organization_id, plan_slug, provider_customer_id, provider_subscription_id,
+    provider_payment_id, status, value_cents
+  ) values (
+    v_org.id, v_plan.slug, p_customer_id, nullif(p_subscription_id, ''),
+    p_payment_id, 'active', p_value_cents
+  );
+
+  insert into public.platform_checkout_access(
+    purchase_key, provider_payment_id, provider_subscription_id, provider_customer_id,
+    organization_id, invite_id, issued_at, email_hash
+  ) values (
+    v_purchase_key, p_payment_id, nullif(p_subscription_id, ''), p_customer_id,
+    v_org.id, gen_random_uuid(), floor(extract(epoch from now()))::bigint, p_email_hash
+  ) returning * into v_access;
+
+  return jsonb_build_object(
+    'eligible', true, 'created', true,
+    'organization_id', v_org.id,
+    'organization_name', v_org.display_name,
+    'plan_name', v_plan.name,
+    'invite_id', v_access.invite_id,
+    'issued_at', v_access.issued_at,
+    'email_sent_at', null
+  );
+end;
+$$;
+
+revoke all on function public.fn_provision_paid_checkout(text,text,text,text,integer,text,text)
+  from public, anon, authenticated;
+grant execute on function public.fn_provision_paid_checkout(text,text,text,text,integer,text,text)
+  to service_role;
+
+notify pgrst, 'reload schema';
+-- END 0238_acesso_apos_pagamento
+
+-- BEGIN 0239_precos_modelos_adicionais
+-- Preços oficiais dos modelos publicados em 0235. Nunca deixe NULL aqui: a
+-- instalação fresca precisa do mesmo teto de orçamento que uma instalação já
+-- atualizada.
+update public.ai_models
+   set input_price_per_million_cents = case
+         when provider = 'mistral' and model_id = 'mistral-small-latest' then 15
+         when provider = 'mistral' and model_id = 'mistral-large-latest' then 50
+         when provider = 'cloudflare' and model_id = '@cf/openai/gpt-oss-20b' then 20
+         when provider = 'cloudflare' and model_id = '@cf/openai/gpt-oss-120b' then 35
+       end,
+       output_price_per_million_cents = case
+         when provider = 'mistral' and model_id = 'mistral-small-latest' then 60
+         when provider = 'mistral' and model_id = 'mistral-large-latest' then 150
+         when provider = 'cloudflare' and model_id = '@cf/openai/gpt-oss-20b' then 30
+         when provider = 'cloudflare' and model_id = '@cf/openai/gpt-oss-120b' then 75
+       end
+ where (provider, model_id) in (
+   ('mistral', 'mistral-small-latest'),
+   ('mistral', 'mistral-large-latest'),
+   ('cloudflare', '@cf/openai/gpt-oss-20b'),
+   ('cloudflare', '@cf/openai/gpt-oss-120b')
+ );
+
+insert into public.ai_pricing
+  (model, prompt_cents_per_million_tokens, completion_cents_per_million_tokens, notes)
+values
+  ('mistral-small-latest', 15, 60, 'catálogo Mistral; conferido em 2026-09-11'),
+  ('mistral-large-latest', 50, 150, 'catálogo Mistral; conferido em 2026-09-11'),
+  ('@cf/openai/gpt-oss-20b', 20, 30, 'catálogo Cloudflare Workers AI; conferido em 2026-09-11'),
+  ('@cf/openai/gpt-oss-120b', 35, 75, 'catálogo Cloudflare Workers AI; conferido em 2026-09-11')
+on conflict (model) do update set
+  prompt_cents_per_million_tokens = excluded.prompt_cents_per_million_tokens,
+  completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,
+  notes = excluded.notes,
+  superseded_at = null;
+-- END 0239_precos_modelos_adicionais
 
 -- ---- VARREDURA anon: toda função security definer criada no apêndice acima ----
 -- Último bloco de propósito: ALTER DEFAULT PRIVILEGES do dump pode fazer uma

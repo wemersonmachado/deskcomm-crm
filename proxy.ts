@@ -3,6 +3,7 @@ import { cookieSecure } from "@/lib/supabase/cookie-secure";
 import { NextResponse, type NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { isPublicPath } from "@/lib/auth/public-paths";
+import { contentSecurityPolicy } from "@/lib/security/csp";
 import {
   verifyImpersonateCookieEdge,
   IMPERSONATE_COOKIE_NAME_EDGE,
@@ -11,10 +12,24 @@ import {
 const COOKIE_NAME = "sb-deskcomm-auth";
 
 export async function proxy(request: NextRequest) {
-  const response = NextResponse.next({ request: { headers: request.headers } });
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const policy = contentSecurityPolicy(nonce, env.NEXT_PUBLIC_SUPABASE_URL, process.env.NODE_ENV === "production");
+  // Não confie no nonce/path enviados pelo cliente. Next extrai o nonce do CSP
+  // encaminhado ao render e o aplica aos seus próprios scripts de hidratação.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("content-security-policy", policy);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const secureResponse = (res: NextResponse) => {
+    res.headers.set("Content-Security-Policy", policy);
+    if (cookieSecure()) res.headers.set("Strict-Transport-Security", "max-age=31536000");
+    return res;
+  };
+  secureResponse(response);
 
   // Inject X-Request-Id for downstream correlation (audit log, error wrappers).
-  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const requestId = crypto.randomUUID();
   response.headers.set("x-request-id", requestId);
 
   const { pathname, search } = request.nextUrl;
@@ -67,7 +82,7 @@ export async function proxy(request: NextRequest) {
     // API routes must respond with JSON envelope (contract: {error:{code,message}})
     // — never redirect HTML to JSON consumers. UI routes redirect to /login as before.
     if (pathname.startsWith("/api/")) {
-      return new NextResponse(
+      return secureResponse(new NextResponse(
         JSON.stringify({
           error: {
             code: "unauthenticated",
@@ -81,11 +96,11 @@ export async function proxy(request: NextRequest) {
             "x-request-id": requestId,
           },
         },
-      );
+      ));
     }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname + search);
-    return NextResponse.redirect(loginUrl);
+    return secureResponse(NextResponse.redirect(loginUrl));
   }
 
   // EPIC-11 S-11.07: validate impersonate cookie on /app/* paths. Middleware
@@ -114,7 +129,7 @@ export async function proxy(request: NextRequest) {
   if (isAdminSurface && pathname.startsWith("/admin") && pathname !== "/admin/forbidden") {
     const { data: isAdmin, error } = await supabase.rpc("fn_is_platform_admin");
     if (error || !isAdmin) {
-      return NextResponse.redirect(new URL("/admin/forbidden", request.url));
+      return secureResponse(NextResponse.redirect(new URL("/admin/forbidden", request.url)));
     }
   }
 

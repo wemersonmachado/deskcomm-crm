@@ -182,6 +182,43 @@ export async function archiveAgentAction(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+/** Exclusão real: remove agente, versões e execuções; conserva somente o audit log. */
+export async function deleteAgentAction(id: string): Promise<ActionResult> {
+  if (!UUID_RX.test(id)) return { ok: false, error: "invalid_request" };
+  const guard = await ensureAdmin();
+  if (guard.kind === "fail") return guard.result;
+  const { authUser, activeOrg } = guard;
+  const admin = createAdminClient();
+  const { data: existing, error: loadError } = await admin
+    .from("ai_agents")
+    .select("id, kind, is_default")
+    .eq("id", id)
+    .eq("organization_id", activeOrg.orgId)
+    .maybeSingle();
+  if (loadError) return { ok: false, error: "internal_error" };
+  if (!existing) return { ok: false, error: "not_found" };
+  if (existing.is_default) return { ok: false, error: "cannot_delete_default" };
+
+  const { data: deleted, error } = await admin.rpc(
+    "fn_delete_ai_agent_definitive" as never,
+    { p_organization_id: activeOrg.orgId, p_agent_id: id } as never,
+  );
+  if (error || deleted !== true) {
+    return { ok: false, error: "internal_error", message: error?.message };
+  }
+
+  await audit({
+    action: "ai_agent.deleted",
+    actorUserId: authUser.id,
+    organizationId: activeOrg.orgId,
+    resourceType: "ai_agent",
+    resourceId: id,
+    metadata: { kind: existing.kind, permanent: true },
+  });
+  revalidatePath("/app/ai/agents");
+  return { ok: true };
+}
+
 export async function renameAgentAction(id: string, name: string): Promise<ActionResult> {
   if (!UUID_RX.test(id)) return { ok: false, error: "invalid_request" };
   const trimmed = (name ?? "").trim();

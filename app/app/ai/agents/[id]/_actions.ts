@@ -25,6 +25,7 @@ import { ROLE_RANK } from "@/lib/auth/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { mensagemDoEscopo, validarEscopoDaVersao } from "@/lib/ai/agents/escopo";
 import {
+  agentCreationDraftSchema,
   agentMcpCreateSchema,
   agentMcpPatchSchema,
   PUBLISH_ERROR_CODES,
@@ -40,6 +41,9 @@ const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const VERSION_COLUMNS =
   "id, organization_id, agent_id, version_number, system_prompt, provider, model, credential_id, tool_ids, trigger_config, channel_session_id, max_steps, token_budget, cost_budget_cents, history_message_window, history_token_window, handoff_keywords, handoff_tool_enabled, cases_enabled, split_messages, split_max_chars, followup, operator_enabled, operator_model, operator_tool_ids, status, published_at, superseded_at, created_at, created_by,pipeline_ids,knowledge_source_ids,provisioning_origin";
 
+const PROMPT_INICIAL = "Você é um atendente. Responda de forma educada e clara, em pt-BR.";
+const NOME_INICIAL = "Novo agente";
+
 type ActionResult<T = void> =
   | { ok: true; data?: T }
   | { ok: false; error: string; message?: string; details?: unknown };
@@ -53,6 +57,198 @@ async function ensureAdmin() {
     return { ok: false as const, error: "forbidden_role" };
   }
   return { ok: true as const, authUser, activeOrg };
+}
+
+// ---------------------------------------------------------------------------
+// Rascunho da PRIMEIRA configuração
+// ---------------------------------------------------------------------------
+
+/**
+ * Reabre o rascunho incompleto mais recente do mesmo autor ou cria um só.
+ * Abrir /new repetidas vezes não espalha cartões vazios pela organização.
+ */
+export async function getOrCreateAgentCreationDraftAction(): Promise<
+  ActionResult<{ agent_id: string }>
+> {
+  const guard = await ensureAdmin();
+  if (!guard.ok) return guard;
+  const { authUser, activeOrg } = guard;
+  const admin = createAdminClient();
+
+  const { data: existing, error: existingError } = await admin
+    .from("ai_agents")
+    .select("id")
+    .eq("organization_id", activeOrg.orgId)
+    .eq("created_by", authUser.id)
+    .eq("kind", "mcp_agent")
+    .is("archived_at", null)
+    .contains("config", { creation_draft: { state: "incomplete" } })
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) {
+    return { ok: false, error: "internal_error", message: existingError.message };
+  }
+
+  if (existing?.id) return { ok: true, data: { agent_id: existing.id } };
+
+  const initialForm = {
+    name: "",
+    description: "",
+    priority: 0,
+    version: { provider: "anthropic", system_prompt: PROMPT_INICIAL },
+  };
+  const { data: created, error: createError } = await admin
+    .from("ai_agents")
+    .insert({
+      organization_id: activeOrg.orgId,
+      name: NOME_INICIAL,
+      description: null,
+      model: "pending",
+      system_prompt: PROMPT_INICIAL,
+      kind: "mcp_agent",
+      priority: 0,
+      is_active: false,
+      is_default: false,
+      created_by: authUser.id,
+    })
+    .select("id, config")
+    .single();
+  if (createError || !created) {
+    return { ok: false, error: "internal_error", message: createError?.message };
+  }
+
+  const config = {
+    ...((created.config ?? {}) as Record<string, unknown>),
+    creation_draft: { state: "incomplete", form: initialForm },
+  };
+  const { error: markError } = await admin
+    .from("ai_agents")
+    .update({ config })
+    .eq("id", created.id)
+    .eq("organization_id", activeOrg.orgId);
+  if (markError) {
+    await admin
+      .from("ai_agents")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", created.id)
+      .eq("organization_id", activeOrg.orgId);
+    return { ok: false, error: "internal_error", message: markError.message };
+  }
+
+  void audit({
+    action: "ai_agent.created",
+    actorUserId: authUser.id,
+    organizationId: activeOrg.orgId,
+    resourceType: "ai_agent",
+    resourceId: created.id,
+    requestId: randomUUID(),
+    metadata: { kind: "mcp_agent", creation_state: "incomplete" },
+  });
+  return { ok: true, data: { agent_id: created.id } };
+}
+
+/** Persiste somente campos conhecidos do formulário; nenhum segredo viaja aqui. */
+export async function saveAgentCreationDraftAction(
+  agentId: string,
+  payload: unknown,
+): Promise<ActionResult<{ saved_at: string }>> {
+  if (!UUID_RX.test(agentId)) return { ok: false, error: "invalid_request" };
+  const guard = await ensureAdmin();
+  if (!guard.ok) return guard;
+  const { activeOrg } = guard;
+  const parsed = agentCreationDraftSchema.safeParse(payload);
+  if (!parsed.success) {
+    return { ok: false, error: "validation_failed", details: parsed.error.flatten() };
+  }
+  const admin = createAdminClient();
+  const [agentQuery, versionQuery] = await Promise.all([
+    admin
+      .from("ai_agents")
+      .select("id, config, archived_at")
+      .eq("id", agentId)
+      .eq("organization_id", activeOrg.orgId)
+      .maybeSingle(),
+    admin
+      .from("ai_agent_versions")
+      .select("id", { count: "exact", head: true })
+      .eq("agent_id", agentId)
+      .eq("organization_id", activeOrg.orgId),
+  ]);
+  const { data: agent, error: agentError } = agentQuery;
+  const { count: versionCount, error: versionError } = versionQuery;
+  if (agentError || versionError) {
+    return {
+      ok: false,
+      error: "internal_error",
+      message: agentError?.message ?? versionError?.message,
+    };
+  }
+  if (!agent) return { ok: false, error: "not_found" };
+  if (agent.archived_at) return { ok: false, error: "agent_archived" };
+  // Fecha a corrida com o salvamento definitivo: depois que existe versão, um
+  // autosave atrasado jamais ressuscita o marcador de configuração incompleta.
+  if ((versionCount ?? 0) > 0) return { ok: false, error: "draft_already_completed" };
+
+  const form = parsed.data;
+  const savedAt = new Date().toISOString();
+  const config = {
+    ...((agent.config ?? {}) as Record<string, unknown>),
+    creation_draft: { state: "incomplete", saved_at: savedAt, form },
+  };
+  const { error } = await admin
+    .from("ai_agents")
+    .update({
+      name: form.name.trim() || NOME_INICIAL,
+      description: form.description.trim() || null,
+      priority: form.priority,
+      config,
+      updated_at: savedAt,
+    })
+    .eq("id", agentId)
+    .eq("organization_id", activeOrg.orgId);
+  if (error) return { ok: false, error: "internal_error", message: error.message };
+
+  // Segunda leitura fecha a corrida com "Concluir configuração". Se a versão
+  // nasceu entre a primeira contagem e o UPDATE acima, este autosave remove o
+  // marcador que acabou de gravar em vez de ressuscitar um rascunho concluído.
+  const { count: completedCount, error: completedError } = await admin
+    .from("ai_agent_versions")
+    .select("id", { count: "exact", head: true })
+    .eq("agent_id", agentId)
+    .eq("organization_id", activeOrg.orgId);
+  if (completedError) {
+    return { ok: false, error: "internal_error", message: completedError.message };
+  }
+  if ((completedCount ?? 0) > 0) {
+    const clearError = await limparMarcadorDeCriacao(
+      admin,
+      agentId,
+      activeOrg.orgId,
+      config,
+    );
+    if (clearError) return { ok: false, error: "internal_error", message: clearError };
+  }
+  revalidatePath("/app/ai/agents");
+  return { ok: true, data: { saved_at: savedAt } };
+}
+
+async function limparMarcadorDeCriacao(
+  admin: ReturnType<typeof createAdminClient>,
+  agentId: string,
+  orgId: string,
+  configAtual: unknown,
+): Promise<string | null> {
+  const config = { ...((configAtual ?? {}) as Record<string, unknown>) };
+  if (!("creation_draft" in config)) return null;
+  delete config.creation_draft;
+  const { error } = await admin
+    .from("ai_agents")
+    .update({ config, updated_at: new Date().toISOString() })
+    .eq("id", agentId)
+    .eq("organization_id", orgId);
+  return error?.message ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +348,7 @@ export async function saveAgentDraftAction(
   // Sanity: o agent existe e é da org? não está arquivado?
   const { data: agent } = await admin
     .from("ai_agents")
-    .select("id, kind, archived_at, name, description, priority, published_version_id")
+    .select("id, kind, archived_at, name, description, priority, published_version_id, config")
     .eq("id", agentId)
     .eq("organization_id", activeOrg.orgId)
     .maybeSingle();
@@ -265,6 +461,20 @@ export async function saveAgentDraftAction(
       if (r.mudou.length > 0) revalidatePath("/app/ai/agents");
     }
 
+    const clearError = await limparMarcadorDeCriacao(
+      admin,
+      agentId,
+      activeOrg.orgId,
+      agent.config,
+    );
+    if (clearError) {
+      return {
+        ok: false,
+        error: "internal_error",
+        message: `A versão foi salva, mas o marcador de criação não foi encerrado: ${clearError}`,
+      };
+    }
+
     revalidatePath(`/app/ai/agents/${agentId}`);
     return {
       ok: true,
@@ -349,6 +559,20 @@ export async function saveAgentDraftAction(
           };
         }
         if (r.mudou.length > 0) revalidatePath("/app/ai/agents");
+      }
+
+      const clearError = await limparMarcadorDeCriacao(
+        admin,
+        agentId,
+        activeOrg.orgId,
+        agent.config,
+      );
+      if (clearError) {
+        return {
+          ok: false,
+          error: "internal_error",
+          message: `A versão foi salva, mas o marcador de criação não foi encerrado: ${clearError}`,
+        };
       }
 
       revalidatePath(`/app/ai/agents/${agentId}`);

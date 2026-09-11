@@ -28,6 +28,7 @@ import { deriveAgentStatus } from "./AgentStatusBadge";
 import type { AgentRow } from "@/hooks/ai/useAgent";
 import {
   archiveAgentAction,
+  deleteAgentAction,
   duplicateAgentAction,
   pauseAgentAction,
   unpauseAgentAction,
@@ -48,6 +49,8 @@ export function AgentRowMenu({ agent }: Props) {
   const status = deriveAgentStatus(agent);
   const isPaused = status === "paused" || status === "draft";
   const isArchived = status === "archived";
+  const incomplete =
+    (agent.config?.creation_draft as { state?: unknown } | undefined)?.state === "incomplete";
 
   const run = (label: string, action: () => Promise<{ ok: boolean; error?: string; message?: string }>) => {
     startTransition(async () => {
@@ -117,14 +120,13 @@ export function AgentRowMenu({ agent }: Props) {
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            disabled={isArchived}
             onSelect={(e) => {
               e.preventDefault();
               setArchiveOpen(true);
             }}
             className="text-destructive focus:text-destructive"
           >
-            <Archive size={14} aria-hidden className="mr-2" /> {t("Arquivar")}
+            <Archive size={14} aria-hidden className="mr-2" /> {isArchived || incomplete ? t("Excluir definitivamente") : t("Arquivar")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -139,22 +141,25 @@ export function AgentRowMenu({ agent }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t("Arquivar")} &ldquo;{agent.name}&rdquo;?
+              {isArchived || incomplete ? t("Excluir definitivamente") : t("Arquivar")} &ldquo;{agent.name}&rdquo;?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t(
-                "O agent deixa de responder gatilhos e some das listas ativas. Versões publicadas são preservadas para auditoria. Não é possível desarquivar pela UI nesta versão.",
-              )}
+              {isArchived || incomplete
+                ? t("Esta ação remove definitivamente o agente, suas versões e execuções. Ela não pode ser desfeita; o registro da ação permanece na auditoria.")
+                : t("O agent deixa de responder gatilhos e some das listas ativas. Versões publicadas são preservadas para auditoria. Não é possível desarquivar pela UI nesta versão.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("Cancelar")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() =>
-                run(t("Agent arquivado."), () => archiveAgentAction(agent.id))
+                run(
+                  isArchived || incomplete ? t("Agente excluído definitivamente.") : t("Agente arquivado."),
+                  () => isArchived || incomplete ? deleteAgentAction(agent.id) : archiveAgentAction(agent.id),
+                )
               }
             >
-              {t("Arquivar")}
+              {isArchived || incomplete ? t("Excluir definitivamente") : t("Arquivar")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

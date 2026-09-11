@@ -24,7 +24,7 @@ export function AgentsList({ initialData, canWrite }: Props) {
   const [query, setQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
 
-  const agents = data ?? [];
+  const agents = useMemo(() => data ?? [], [data]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -48,11 +48,16 @@ export function AgentsList({ initialData, canWrite }: Props) {
           )}
         </p>
         {canWrite && (
-          <Link href="/app/ai/agents/new">
-            <Button className="mt-1">
-              <Plus size={14} aria-hidden className="mr-2" /> {t("Novo agente")}
-            </Button>
-          </Link>
+          <div className="mt-1 flex flex-wrap justify-center gap-2">
+            <Link href="/app/settings/api-tokens">
+              <Button variant="outline">{t("Conectar agente externo (MCP)")}</Button>
+            </Link>
+            <Link href="/app/ai/agents/new">
+              <Button>
+                <Plus size={14} aria-hidden className="mr-2" /> {t("Novo agente")}
+              </Button>
+            </Link>
+          </div>
         )}
       </Card>
     );
@@ -70,13 +75,27 @@ export function AgentsList({ initialData, canWrite }: Props) {
           onShowArchivedChange={setShowArchived}
         />
         {canWrite && (
-          <Link href="/app/ai/agents/new">
-            <Button>
-              <Plus size={14} aria-hidden className="mr-2" /> {t("Novo agente")}
-            </Button>
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/app/settings/api-tokens">
+              <Button variant="outline">{t("Conectar agente externo (MCP)")}</Button>
+            </Link>
+            <Link href="/app/ai/agents/new">
+              <Button>
+                <Plus size={14} aria-hidden className="mr-2" /> {t("Novo agente")}
+              </Button>
+            </Link>
+          </div>
         )}
       </div>
+
+      {canWrite && (
+        <Card className="p-4 text-sm">
+          <p className="font-medium">{t("Já possui um agente em outra nuvem ou VPS?")}</p>
+          <p className="mt-1 text-muted-foreground">
+            {t("Conecte-o pelo MCP com um token exclusivo desta organização. Os escopos limitam leitura e escrita, e o agente externo nunca escolhe outra organização pelo corpo da requisição.")}
+          </p>
+        </Card>
+      )}
 
       {filtered.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted-foreground">

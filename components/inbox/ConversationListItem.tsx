@@ -54,6 +54,9 @@ interface Props {
    * afirme nada".
    */
   automaticoDaOrg?: boolean;
+  selectionMode?: boolean;
+  contactSelected?: boolean;
+  onToggleContact?: (contactId: string) => void;
 }
 
 /**
@@ -119,6 +122,9 @@ export function ConversationListItem({
   mostrarAtendente,
   mostrarAutomatico = true,
   automaticoDaOrg,
+  selectionMode = false,
+  contactSelected = false,
+  onToggleContact,
 }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
@@ -168,11 +174,11 @@ export function ConversationListItem({
     Boolean(c?.is_blocked) ||
     Boolean(c?.is_anonymized);
 
-  return (
+  const row = (
     <button
       type="button"
       data-conversation-id={conversation.id}
-      onClick={() => onSelect(conversation.id)}
+      onClick={() => selectionMode && conversation.contact_id ? onToggleContact?.(conversation.contact_id) : onSelect(conversation.id)}
       className={cn(
         "group relative flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left transition-colors hover:bg-surface-elevated",
         "focus-visible:outline-hidden focus-visible:bg-surface-elevated",
@@ -293,4 +299,6 @@ export function ConversationListItem({
       </div>
     </button>
   );
+  if (!selectionMode) return row;
+  return <div className="flex items-stretch border-b border-border/70"><label className="flex items-center px-2"><input type="checkbox" aria-label={`${t("Selecionar")} ${displayName}`} checked={contactSelected} onChange={() => conversation.contact_id && onToggleContact?.(conversation.contact_id)} /></label><div className="min-w-0 flex-1">{row}</div></div>;
 }

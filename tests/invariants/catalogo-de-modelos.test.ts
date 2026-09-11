@@ -61,8 +61,18 @@ describe("catálogo de modelos", () => {
       `select provider || '=' || count(*) from public.ai_models
         where is_default_for_provider group by provider order by provider;`,
     );
-    const padroes = out.split("\n").map((l) => l.trim()).filter(Boolean);
-    expect(padroes.sort()).toEqual(["anthropic=1", "google=1", "openai=1"]);
+    const padroes = out
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    expect(padroes.sort()).toEqual([
+      "anthropic=1",
+      "cloudflare=1",
+      "google=1",
+      "groq=1",
+      "mistral=1",
+      "openai=1",
+    ]);
   });
 
   it("o padrão de cada provedor não está depreciado", () => {
@@ -127,7 +137,9 @@ describe("catálogo de modelos", () => {
                              'gpt-5.6-sol','gpt-5.6-terra','gpt-5.6-luna','gpt-5.5',
                              'gpt-5.5-pro','gpt-5.4','gpt-5.4-mini','gpt-5.4-nano',
                              'gpt-5.4-pro','gemini-3.1-pro-preview','gemini-3.5-flash',
-                             'gemini-2.5-flash-lite','gemini-2.0-flash')
+                             'gemini-2.5-flash-lite','gemini-2.0-flash',
+                             'mistral-small-latest','mistral-large-latest',
+                             '@cf/openai/gpt-oss-20b','@cf/openai/gpt-oss-120b')
           and (p.model is null or p.notes not like 'catálogo%')
         order by 1;`,
     );

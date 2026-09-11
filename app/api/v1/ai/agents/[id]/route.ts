@@ -210,7 +210,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx): Promise<Response> 
 }
 
 // ---------------------------------------------------------------------------
-// DELETE — soft delete (is_active=false). 409 se is_default=true.
+// DELETE — exclusão definitiva. 409 se is_default=true.
 // ---------------------------------------------------------------------------
 
 export async function DELETE(_req: NextRequest, ctx: RouteCtx): Promise<Response> {
@@ -253,32 +253,23 @@ export async function DELETE(_req: NextRequest, ctx: RouteCtx): Promise<Response
     );
   }
 
-  // mcp_agent: soft archive via archived_at + clear published_version_id (pausa
-  // dispatcher). rag_bot legado mantém comportamento is_active=false.
-  const isMcp = existing.kind === "mcp_agent";
-  const patch: Record<string, unknown> = isMcp
-    ? { archived_at: new Date().toISOString(), published_version_id: null, is_active: false }
-    : { is_active: false };
-
-  const { error: updErr } = await admin
-    .from("ai_agents")
-    .update(patch)
-    .eq("id", id)
-    .eq("organization_id", activeOrg.orgId);
-
-  if (updErr) {
-    return fail("internal_error", "Erro ao desativar agent.", 500, { requestId });
+  const { data: deleted, error: deleteError } = await admin.rpc(
+    "fn_delete_ai_agent_definitive" as never,
+    { p_organization_id: activeOrg.orgId, p_agent_id: id } as never,
+  );
+  if (deleteError || deleted !== true) {
+    return fail("internal_error", "Erro ao excluir agent.", 500, { requestId });
   }
 
   void audit({
-    action: "ai_agent.archived",
+    action: "ai_agent.deleted",
     actorUserId: authUser.id,
     organizationId: activeOrg.orgId,
     resourceType: "ai_agent",
     resourceId: id,
     requestId,
-    metadata: { kind: existing.kind },
+    metadata: { kind: existing.kind, permanent: true },
   });
 
-  return ok({ id, archived: isMcp, is_active: false }, { requestId });
+  return ok({ id, deleted: true }, { requestId });
 }

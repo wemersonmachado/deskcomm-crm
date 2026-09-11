@@ -10,6 +10,12 @@
 
 ## Convenções
 
+### Landing e contrato MCP — 2026-09-10
+
+- [P1] `scripts/qa-landing-visual.ts`: página pública desktop/mobile, FAQ, overflow e erros de JavaScript; evidência em `evidence/producao/`. Produção existente, não instalação fresca.
+- [P1] `scripts/qa-landing-mcp-production.ts`: login sintético pela tela, rascunho persistido/listado/restaurado, seleção de executor/origem, contrato MCP publicado e recusa cross-tenant, editor público recusado ao tenant e permitido a superadmin temporário. Fixtures isoladas e removidas; execução exige opt-in explícito.
+- Não substituem `tests/e2e` com baseline fresco ou `test:db`. Não provam inferência/atendimento de uma VPS externa. Relatório na raiz: `ENTREGA-LANDING-MCP-2026-09-10.md`.
+
 ### Interface padrão editável — 2026-09-09
 
 - [P1] `suporte-temporario.spec.ts`: super admin salva Completa, recarrega,
@@ -1972,6 +1978,18 @@ Browser r3 passou **2 jornadas/30,0s**, appprodução3013, sessão e PostgREST r
 `evidence/comunidade-360/task8-medidas.json` contém origem, hashes e medidas reais. Seção Meet com335px no desktop1440 e243,5px no mobile390; sem overflow horizontal, controles na viewport. A aquisição do job no browser é SQL manual restrita à fixture: prova consumer/ledger/HTTP, não o scheduler completo. Incerteza, opt-out, revogação, claim antigo, cancelamento e redação durante HTTP permanecem nas provas DB/receiver; não são atribuídos às duas jornadas UI.
 
 Testes: `tests/e2e/agenda-google-meet.spec.ts`, `tests/invariants/agenda-meet.test.ts`, `tests/invariants/agenda-meet-export.test.ts`, `tests/unit/agenda-meet*.test.ts*` e `tests/unit/lgpd-pdf-meet.test.ts`. Unit integral710arquivos/7671PASS+1expectedfail; DB integral171arquivos/1386PASS+1expectedfail+1skip, INSTALL/UPDATE PG15. Após o reparo runtime,75casos focados/type/lint e novo build/browser passaram; sem repetição do DB sem delta SQL.0226 aplicada/imutável no QA, junto com0224/0225. Limpeza0organizações/0usuários meet-ui, app/receivers/pools encerrados e namespace demo preservado. Histórico e limites completos em `.superpowers/sdd/comunidade-360/task-8-report.md`.
+
+### Criação persistente e conexão de agentes
+
+- [P0] `tests/e2e/agente-novo-e-uso.spec.ts`: abrir Novo agente, preencher parte do
+  nome, observar o autosave, sair para a lista e retomar o mesmo rascunho sem
+  perda; a tela nomeia cada etapa pendente e só libera a conclusão quando a
+  configuração inteira é válida.
+- [P1] A lista identifica configuração incompleta e oferece a porta
+  **Conectar agente externo (MCP)**. A execução externa usa `/api/mcp`, token
+  org-scoped e scopes mínimos; o teste de transporte com um runtime externo
+  real depende de uma credencial/controlador escolhido pelo operador e não é
+  simulado como entrega externa.
 
 ### Autonomia e revisão de respostas (Task9)
 

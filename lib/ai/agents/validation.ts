@@ -170,6 +170,29 @@ export type VersionInput = z.infer<typeof versionShapeSchema>;
 
 export const versionCreateSchema = versionShapeSchema;
 
+/**
+ * Estado parcial do assistente enquanto a primeira versão ainda não existe.
+ *
+ * O editor precisa aceitar campos ainda vazios (modelo/canal/credencial), mas
+ * continua recusando chaves desconhecidas e valores fora dos mesmos limites da
+ * versão definitiva. O vazio é representado por ausência/null — nunca por um
+ * UUID inventado.
+ */
+export const agentCreationDraftSchema = z
+  .object({
+    name: z.string().max(120),
+    description: z.string().max(2000),
+    priority: z.number().int().min(0).max(1000),
+    version: versionShapeSchema.partial().extend({
+      model: z.string().trim().min(1).max(120).optional(),
+      credential_id: UUID.nullable().optional(),
+      channel_session_id: UUID.nullable().optional(),
+    }),
+  })
+  .strict();
+
+export type AgentCreationDraft = z.infer<typeof agentCreationDraftSchema>;
+
 /** Edits permitted only on draft versions. All fields optional. */
 export const versionPatchSchema = versionShapeSchema.partial();
 

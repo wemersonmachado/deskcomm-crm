@@ -54,7 +54,7 @@ export async function PublicEnvScript({
    */
   readonly marca: { readonly name: string; readonly logoUrl: string | null };
 }) {
-  await headers();
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   const payload = JSON.stringify({
     NEXT_PUBLIC_SUPABASE_URL: env.NEXT_PUBLIC_SUPABASE_URL,
@@ -77,6 +77,7 @@ export async function PublicEnvScript({
 
   return (
     <script
+      nonce={nonce}
       // Conteúdo derivado de env do servidor (não de input do usuário).
       dangerouslySetInnerHTML={{ __html: `window.__PUBLIC_ENV__=${payload};` }}
     />

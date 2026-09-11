@@ -287,12 +287,11 @@ describe("PUT /api/v1/ai/pacing — erro do banco diz QUAL campo recusou", () =>
     const corpo = await res.json();
 
     expect(res.status).toBe(500);
-    // Sem isto, um `not null` vira "Falha ao salvar os knobs." e ninguém sabe
-    // qual campo recusou — foi essa ausência que custou o diagnóstico.
-    expect(corpo.error.details).toBeDefined();
-    expect(JSON.stringify(corpo.error.details)).toContain("number_activated_at");
-    // E o operador continua lendo português, não uma frase do Postgres.
-    expect(corpo.error.message).toBe("Falha ao salvar os knobs.");
+    // Falhas 5xx não devolvem detalhes do banco na borda pública. O request-id
+    // preserva a correlação operacional sem vazar schema ou infraestrutura.
+    expect(corpo.error.details).toBeUndefined();
+    expect(corpo.error.message).toBe("Não foi possível concluir a operação. Tente novamente.");
+    expect(res.headers.get("x-request-id")).toBeTruthy();
   });
 });
 

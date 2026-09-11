@@ -51,12 +51,14 @@ import { BasesDoAgente, type MaterialDoAcervo } from "./BasesDoAgente";
 import { FunisDoAgente, type CoberturaPorFunil } from "./FunisDoAgente";
 import { PublishConfirmDialog } from "./PublishConfirmDialog";
 import {
+  saveAgentCreationDraftAction,
   saveAgentDraftAction,
   publishAgentAction,
   createMcpAgentAction,
 } from "../_actions";
 
 import {
+  agentCreationDraftSchema,
   versionCreateSchema,
   agentMcpCreateSchema,
   agentMcpPatchSchema,
@@ -185,7 +187,7 @@ function buildState(args: {
   version: AgentVersionRow | null;
 }): FormState {
   const { agent, version } = args;
-  return {
+  const base: FormState = {
     name: agent?.name ?? "",
     description: agent?.description ?? "",
     priority: agent?.priority ?? 0,
@@ -224,6 +226,43 @@ function buildState(args: {
     pipeline_ids: version?.pipeline_ids ?? [],
     // `?? []` = nenhum material. Mesma direção segura: agir de menos.
     knowledge_source_ids: version?.knowledge_source_ids ?? [],
+  };
+
+  const creationDraft = agentCreationDraftSchema.safeParse(
+    (agent?.config?.creation_draft as { form?: unknown } | undefined)?.form,
+  );
+  if (!creationDraft.success) return base;
+  const saved = creationDraft.data;
+  const v = saved.version;
+  return {
+    ...base,
+    name: saved.name,
+    description: saved.description,
+    priority: saved.priority,
+    provider: v.provider ?? base.provider,
+    model: v.model ?? "",
+    credential_id:
+      v.credential_id === null ? CHAVE_DA_INSTALACAO : (v.credential_id ?? ""),
+    channel_session_id: v.channel_session_id ?? "",
+    system_prompt: v.system_prompt ?? base.system_prompt,
+    tool_ids: v.tool_ids ?? base.tool_ids,
+    trigger_config: (v.trigger_config as TriggerValue | undefined) ?? base.trigger_config,
+    max_steps: v.max_steps ?? base.max_steps,
+    token_budget: v.token_budget ?? base.token_budget,
+    cost_budget_cents: v.cost_budget_cents ?? base.cost_budget_cents,
+    history_message_window: v.history_message_window ?? base.history_message_window,
+    history_token_window: v.history_token_window ?? base.history_token_window,
+    handoff_keywords: v.handoff_keywords ?? base.handoff_keywords,
+    handoff_tool_enabled: v.handoff_tool_enabled ?? base.handoff_tool_enabled,
+    cases_enabled: v.cases_enabled ?? base.cases_enabled,
+    split_messages: v.split_messages ?? base.split_messages,
+    split_max_chars: v.split_max_chars ?? base.split_max_chars,
+    followup: v.followup ?? base.followup,
+    operator_enabled: v.operator_enabled ?? base.operator_enabled,
+    operator_model: v.operator_model ?? "",
+    operator_tool_ids: v.operator_tool_ids ?? base.operator_tool_ids,
+    pipeline_ids: v.pipeline_ids ?? base.pipeline_ids,
+    knowledge_source_ids: v.knowledge_source_ids ?? base.knowledge_source_ids,
   };
 }
 
@@ -278,6 +317,21 @@ function toVersionPayload(s: FormState) {
   };
 }
 
+function toCreationDraftPayload(s: FormState) {
+  const version = toVersionPayload(s);
+  return {
+    name: s.name,
+    description: s.description,
+    priority: s.priority,
+    version: {
+      ...version,
+      ...(version.model ? { model: version.model } : { model: undefined }),
+      credential_id: version.credential_id || null,
+      channel_session_id: version.channel_session_id || null,
+    },
+  };
+}
+
 export function AgentForm(props: Props) {
   const t = useT();
   const funis = props.funis ?? [];
@@ -301,6 +355,11 @@ export function AgentForm(props: Props) {
   const [saving, setSaving] = React.useState(false);
   const [publishing, setPublishing] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [automaticSave, setAutomaticSave] = React.useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const creationCompletedRef = React.useRef(false);
+  const automaticSaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
    * Qual papel está aberto. Estado LOCAL e não rota: trocar de papel não é
    * navegação — o rascunho é um só, e uma URL por papel faria o usuário achar
@@ -309,6 +368,12 @@ export function AgentForm(props: Props) {
   const [papel, setPapel] = React.useState<"conversa" | "operacao" | "seguranca">("conversa");
 
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
+  const isCreationDraft =
+    isEdit &&
+    !props.draft &&
+    !props.published &&
+    (props.agent.config?.creation_draft as { state?: unknown } | undefined)?.state ===
+      "incomplete";
 
   function patch(p: Partial<FormState>) {
     setForm((prev) => ({ ...prev, ...p }));
@@ -376,9 +441,44 @@ export function AgentForm(props: Props) {
       }
     }
     return errors;
-  }, [form, t]);
+  }, [form, props.provedoresDaInstalacao, t]);
 
   const isValid = Object.keys(validation).length === 0;
+  const pendingReasons = React.useMemo(() => {
+    const guidance: Record<string, string> = {
+      name: t("Nome — informe como este agente será identificado."),
+      priority: t("Ordem de preferência — use um número entre 0 e 1000."),
+      system_prompt: t("Instruções — descreva como o agente deve atender."),
+      model: t("Modelo — escolha a inteligência artificial usada no atendimento."),
+      credential_id: t("Chave de acesso — selecione ou cadastre uma credencial válida."),
+      channel_session_id: t("Número conectado — escolha o WhatsApp que este agente atenderá."),
+      tool_ids: t("Capacidades — reduza a seleção até o limite permitido."),
+    };
+    return [...new Set(Object.entries(validation).map(([field, message]) => guidance[field] ?? message))];
+  }, [validation, t]);
+
+  React.useEffect(() => {
+    if (!isCreationDraft || !dirty || readOnly || creationCompletedRef.current) return;
+    if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
+    setAutomaticSave("saving");
+    automaticSaveTimer.current = setTimeout(async () => {
+      const result = await saveAgentCreationDraftAction(
+        props.agent.id,
+        toCreationDraftPayload(form),
+      );
+      if (result.ok) {
+        setAutomaticSave("saved");
+      } else if (result.error === "draft_already_completed") {
+        creationCompletedRef.current = true;
+        setAutomaticSave("saved");
+      } else {
+        setAutomaticSave("error");
+      }
+    }, 800);
+    return () => {
+      if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
+    };
+  }, [dirty, form, isCreationDraft, props, readOnly]);
 
   const publishBlockReason = React.useMemo(() => {
     if (!isEdit) return t("Salve o agent antes de publicar.");
@@ -405,12 +505,15 @@ export function AgentForm(props: Props) {
       return;
     }
     setSaving(true);
+    if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
+    creationCompletedRef.current = true;
     try {
       if (isEdit) {
         // A mesma régua do servidor, aqui, para o erro aparecer no campo em vez
         // de voltar como 500 depois de a versão já ter sido gravada.
         const cadastro = agentMcpPatchSchema.safeParse(toCadastroPayload(form));
         if (!cadastro.success) {
+          creationCompletedRef.current = false;
           toast.error(t("Validação falhou."));
           return;
         }
@@ -420,6 +523,7 @@ export function AgentForm(props: Props) {
           cadastro.data,
         );
         if (!res.ok) {
+          creationCompletedRef.current = false;
           toast.error(res.message ?? `${t("Erro")}: ${res.error}`);
           return;
         }
@@ -545,7 +649,13 @@ export function AgentForm(props: Props) {
             </Button>
           ) : null}
           <Button onClick={handleSave} disabled={(!dirty && isEdit) || disabled || !isValid}>
-            {saving ? t("Salvando…") : isEdit ? t("Salvar rascunho") : t("Criar agente")}
+            {saving
+              ? t("Salvando…")
+              : isCreationDraft
+                ? t("Concluir configuração")
+                : isEdit
+                  ? t("Salvar rascunho")
+                  : t("Criar agente")}
           </Button>
           {isEdit ? (
             <span title={publishBlockReason ?? undefined}>
@@ -564,6 +674,48 @@ export function AgentForm(props: Props) {
           ) : null}
         </div>
       </div>
+
+      {(isCreationDraft || !isValid) && (
+        <Card
+          className={isValid ? "border-emerald-500/40 bg-emerald-500/5 p-4" : "border-amber-500/40 bg-amber-500/5 p-4"}
+          role="status"
+          data-testid="agent-completion-guide"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-medium">
+                {isValid
+                  ? t("Tudo pronto para concluir a configuração")
+                  : `${t("Faltam")} ${pendingReasons.length} ${pendingReasons.length === 1 ? t("etapa") : t("etapas")} ${t("para concluir")}`}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {isCreationDraft
+                  ? t("Este rascunho fica salvo mesmo se você sair desta página. Você pode retomá-lo ou apagá-lo pela lista de agentes.")
+                  : t("Resolva os itens abaixo para liberar o salvamento.")}
+              </p>
+            </div>
+            {isCreationDraft && (
+              <Badge variant="outline">
+                {automaticSave === "saving"
+                  ? t("Salvando rascunho…")
+                  : automaticSave === "error"
+                    ? t("Falha ao salvar automaticamente")
+                    : t("Rascunho salvo")}
+              </Badge>
+            )}
+          </div>
+          {!isValid && (
+            <ul className="mt-3 grid gap-1 text-sm md:grid-cols-2">
+              {pendingReasons.map((reason) => (
+                <li key={reason} className="flex gap-2">
+                  <span aria-hidden>•</span>
+                  <span>{reason}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
 
       {/*
         NAVEGAÇÃO POR PAPEL (spec 16 §6). Um form só, um save só — os papéis são

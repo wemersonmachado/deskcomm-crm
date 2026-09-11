@@ -10,6 +10,7 @@ import type { LanguageModel } from 'ai';
 import { MockLanguageModelV3 } from 'ai/test';
 
 import { allowlistedFetch, buildAllowlist } from '../egress';
+import { parseCloudflareAiCredential } from '@/lib/ai/cloudflare-credential';
 
 /**
  * provider name → (chave BYOK da org, id do modelo, endpoint opcional) → modelo
@@ -42,6 +43,9 @@ const GOOGLE_ENDPOINT = 'https://generativelanguage.googleapis.com';
  * `familia/modelo`, o mesmo dos nossos, sem tradução no meio.
  */
 export const OPENROUTER_ENDPOINT = 'https://openrouter.ai/api/v1';
+export const MISTRAL_ENDPOINT = 'https://api.mistral.ai/v1';
+export const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1';
+export const CLOUDFLARE_API_ENDPOINT = 'https://api.cloudflare.com';
 
 /**
  * Cabeçalhos OPCIONAIS de atribuição da OpenRouter.
@@ -111,6 +115,28 @@ export function createDefaultRegistry(opts?: { allowedHosts?: string[] }): Provi
         headers: cabecalhosDeAtribuicaoOpenRouter(),
         fetch: contain(endpoint),
       })(modelId);
+    },
+    mistral: (apiKey, modelId) =>
+      createOpenAI({
+        apiKey,
+        baseURL: MISTRAL_ENDPOINT,
+        fetch: contain(MISTRAL_ENDPOINT),
+      }).chat(modelId),
+    groq: (apiKey, modelId) =>
+      createOpenAI({
+        apiKey,
+        baseURL: GROQ_ENDPOINT,
+        fetch: contain(GROQ_ENDPOINT),
+      }).chat(modelId),
+    cloudflare: (credential, modelId) => {
+      const parsed = parseCloudflareAiCredential(credential);
+      if (!parsed) throw new Error('cloudflare_credential_invalid');
+      const endpoint = `${CLOUDFLARE_API_ENDPOINT}/client/v4/accounts/${parsed.accountId}/ai/v1`;
+      return createOpenAI({
+        apiKey: parsed.apiToken,
+        baseURL: endpoint,
+        fetch: contain(endpoint),
+      }).chat(modelId);
     },
   };
 }

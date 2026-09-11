@@ -278,9 +278,11 @@ consequência natural de trabalho em branches paralelas, mas ilustra a regra:
 3. ✅ **`ffmpeg` na imagem** — era contingência aberta no HANDOFF; **resolvido**:
    `Dockerfile:55` faz `apk add --no-cache ffmpeg`, com comentário explicando que a derivação
    de vídeo roda no processo do app via o cron `event-log-drain`. Registrado como fechado.
-4. **Dependência de credencial de terceiro para provar IA**: se Anthropic segue com credencial
-   placeholder e Google com chave de gateway inválida, o caminho multimodal está provado em um
-   único provider (OpenAI) apesar de o design ser model-agnostic. **A CONFIRMAR** se ainda vale.
+4. **Dependência de credencial de terceiro para provar IA**: o registry e a tela aceitam
+   Anthropic, OpenAI, Google, OpenRouter, Mistral, Groq e Cloudflare Workers AI. Os testes
+   exercitam a fábrica de todos eles sem expor segredos, mas uma chamada real continua
+   dependendo de uma credencial válida da organização para cada provedor; não confundir
+   compatibilidade implementada com cota ou disponibilidade externa comprovada.
 5. **`lib/agent-engine/agent/inbound-turn.ts` com 1789 linhas** — 2,4× o segundo maior arquivo
    de lógica (`AgentForm.tsx`, 746), e é o hot path do produto. Cresceu ~200 linhas desde a
    primeira medição desta auditoria.

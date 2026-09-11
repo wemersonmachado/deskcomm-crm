@@ -1,5 +1,13 @@
 # Política de Segurança
 
+Estado operacional desta instalação e evidências da rodada de 2026-09-10:
+[handoff de segurança](HANDOFF-SEGURANCA.md). O documento distingue produção,
+alterações locais e verificações pendentes; não é certificação de segurança.
+
+Segredos operacionais pertencem somente ao `.env` local ignorado e ao cofre do
+operador. Documentação e Git registram nomes, procedimento e estado, nunca os
+valores.
+
 ## Versões suportadas
 
 O DeskcommCRM é distribuído em rolling release a partir da branch `main`. Correções de segurança são aplicadas apenas à versão mais recente — mantenha sua instalação atualizada (`bash hostgator-setup-kit/update.sh` em self-host).

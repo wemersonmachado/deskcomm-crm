@@ -41,7 +41,7 @@ export async function updateTenant(input: TenantInput): Promise<UpdateTenantResu
   }
 
   /**
-   * A ESCRITA EM `organizations` VAI PELO ADMIN CLIENT — e não é preguiça.
+   * A ESCRITA EM `organizations` VAI PELA RPC service-role — e não é preguiça.
    *
    * A única policy de escrita da tabela é `orgs_write_platform_admin`, com
    * `USING (fn_is_platform_admin())`. Pelo client de sessão, o UPDATE de quem não
@@ -57,7 +57,8 @@ export async function updateTenant(input: TenantInput): Promise<UpdateTenantResu
    *
    * O gate continua sendo o de cima (papel resolvido de fonte confiável), e o
    * filtro por `organization_id` é explícito, como a doutrina exige de todo
-   * handler que usa service role.
+   * handler que usa service role. A RPC também mantém o padrão visual e os
+   * vínculos herdados na mesma transação.
    */
   const supabase = createAdminClient();
   const hdrs = await headers();
@@ -81,21 +82,28 @@ export async function updateTenant(input: TenantInput): Promise<UpdateTenantResu
     ...(parsed.data.interface_default ? { interface_default: parsed.data.interface_default } : {}),
   };
 
-  const { error } = await supabase
-    .from("organizations")
-    .update({
-      display_name: parsed.data.display_name,
-      legal_name: parsed.data.legal_name,
-      cnpj: parsed.data.cnpj ?? null,
-      timezone: parsed.data.timezone,
-      locale: parsed.data.locale,
-      currency: parsed.data.currency,
-      media_retention_days: parsed.data.media_retention_days,
-      dpo_email: parsed.data.dpo_email ?? null,
-      privacy_policy_url: parsed.data.privacy_policy_url ?? null,
-      settings: nextSettings,
-    })
-    .eq("id", activeOrg.orgId);
+  // A função atualiza o JSON da organização e, no MESMO lock/transação, os
+  // memberships que ainda usam o padrão anterior. Dois PATCHes separados já
+  // deixaram a tela dizer "Completa" enquanto os membros herdados continuavam
+  // na Simplificada quando o segundo request falhava.
+  const { data: propagation, error } = await supabase.rpc(
+    "fn_update_organization_with_interface_default" as never,
+    {
+      p_organization_id: activeOrg.orgId,
+      p_display_name: parsed.data.display_name,
+      p_legal_name: parsed.data.legal_name,
+      p_cnpj: parsed.data.cnpj ?? null,
+      p_timezone: parsed.data.timezone,
+      p_locale: parsed.data.locale,
+      p_currency: parsed.data.currency,
+      p_media_retention_days: parsed.data.media_retention_days,
+      p_dpo_email: parsed.data.dpo_email ?? null,
+      p_privacy_policy_url: parsed.data.privacy_policy_url ?? null,
+      p_settings: nextSettings,
+      p_propagate_interface_default: !!parsed.data.interface_default &&
+        parsed.data.apply_interface_default_to_active_members,
+    } as never,
+  );
   if (error) return { ok: false, error: error.message };
 
   await audit({
@@ -109,6 +117,10 @@ export async function updateTenant(input: TenantInput): Promise<UpdateTenantResu
     userAgent,
     metadata: {
       fields_changed: Object.keys(parsed.data),
+      interface_members_updated:
+        propagation && typeof propagation === "object" && "members_updated" in propagation
+          ? (propagation as { members_updated?: unknown }).members_updated
+          : 0,
     },
   });
 
@@ -125,6 +137,6 @@ export async function updateTenant(input: TenantInput): Promise<UpdateTenantResu
       if (e) console.error("[updateTenant] emit_event failed", e.message);
     });
 
-  revalidatePath("/app/settings/tenant");
+  revalidatePath("/app", "layout");
   return { ok: true };
 }

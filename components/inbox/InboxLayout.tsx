@@ -409,6 +409,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
             onSelect={handleSelect}
             clientFilter={clientFilter}
             onVisibleChange={handleVisibleChange}
+            supportReadonly={supportReadonly}
           />
         </div>
       </div>

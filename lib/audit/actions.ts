@@ -162,6 +162,7 @@ export const AUDIT_ACTIONS = [
   "ai_agent.created",
   "ai_agent.updated",
   "ai_agent.archived",
+  "ai_agent.deleted",
   "ai_agent.duplicated",
   "ai_agent.paused",
   "ai_agent.published",
@@ -266,7 +267,14 @@ export const AUDIT_ACTIONS = [
   "auth.password_reset_request_failed",
   "auth.password_reset_completed",
   "auth.password_reset_failed",
+  // Mudanças deliberadas dentro da sessão são diferentes de recuperação por
+  // e-mail: a auditoria precisa mostrar se foi a própria pessoa autenticada.
+  "auth.password_changed_from_settings",
+  "auth.password_change_failed",
+  "auth.email_change_requested",
+  "auth.email_change_request_failed",
   "tenant.created_by_signup",
+  "tenant.created_by_payment",
   "tenant.created_by_recovery",
   "conversation.snoozed",
   "conversation.snooze_cancelled",

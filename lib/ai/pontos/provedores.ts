@@ -40,6 +40,8 @@ export interface ProvedorSuportado {
   ondePegarAChave: string;
   /** Como a chave começa — vira placeholder do campo, para a pessoa reconhecer que copiou a coisa certa. */
   prefixoDaChave: string;
+  /** Instrução adicional quando o provedor exige mais de um identificador. */
+  comoInformarChave?: string;
 }
 
 export const PROVEDORES = [
@@ -82,6 +84,38 @@ export const PROVEDORES = [
     catalogoSincronizavel: true,
     ondePegarAChave: "https://openrouter.ai/keys",
     prefixoDaChave: "sk-or-…",
+  },
+  {
+    id: "mistral",
+    rotulo: "Mistral AI",
+    quandoUsar:
+      "Modelos europeus rápidos, com opções econômicas e suporte a ferramentas para atendimento e automação.",
+    aceitaEndpointProprio: false,
+    catalogoSincronizavel: true,
+    ondePegarAChave: "https://console.mistral.ai/api-keys",
+    prefixoDaChave: "sua chave da Mistral",
+  },
+  {
+    id: "groq",
+    rotulo: "Groq",
+    quandoUsar:
+      "Inferência muito rápida em modelos abertos; oferece plano de desenvolvimento para testar antes de ampliar o uso.",
+    aceitaEndpointProprio: false,
+    catalogoSincronizavel: true,
+    ondePegarAChave: "https://console.groq.com/keys",
+    prefixoDaChave: "gsk_…",
+  },
+  {
+    id: "cloudflare",
+    rotulo: "Cloudflare Workers AI",
+    quandoUsar:
+      "Executa modelos abertos na rede da Cloudflare e é uma boa opção para quem já usa Workers e quer baixa latência.",
+    aceitaEndpointProprio: false,
+    catalogoSincronizavel: true,
+    ondePegarAChave: "https://dash.cloudflare.com/profile/api-tokens",
+    prefixoDaChave: "account_id:api_token",
+    comoInformarChave:
+      "Informe o ID da conta, dois-pontos e o token Workers AI: account_id:api_token. O conjunto é criptografado no cofre da organização.",
   },
 ] as const satisfies readonly ProvedorSuportado[];
 // `as const satisfies` e não anotação de tipo: a anotação apagaria os literais

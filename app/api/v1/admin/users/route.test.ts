@@ -282,8 +282,9 @@ describe("GET /api/v1/admin/users — teto de páginas da varredura", () => {
     };
     expect(body.error.code).toBe("upstream_unavailable");
     expect(body.error.message).not.toMatch(/maior que o suportado/i);
-    // 1 dos 2 vínculos ficou sem usuário: o número é a informação, não a causa.
-    expect(body.error.details).toContain("1 of 2 link(s) unresolved");
+    // A contagem operacional não cruza a borda em uma falha 5xx.
+    expect(body.error.details).toBeUndefined();
+    expect(res.headers.get("x-request-id")).toBeTruthy();
   });
 });
 
