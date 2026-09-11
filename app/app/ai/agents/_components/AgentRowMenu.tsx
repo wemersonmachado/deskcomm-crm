@@ -28,6 +28,7 @@ import { deriveAgentStatus } from "./AgentStatusBadge";
 import type { AgentRow } from "@/hooks/ai/useAgent";
 import {
   archiveAgentAction,
+  deleteAgentAction,
   duplicateAgentAction,
   pauseAgentAction,
   unpauseAgentAction,
@@ -119,14 +120,13 @@ export function AgentRowMenu({ agent }: Props) {
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            disabled={isArchived}
             onSelect={(e) => {
               e.preventDefault();
               setArchiveOpen(true);
             }}
             className="text-destructive focus:text-destructive"
           >
-            <Archive size={14} aria-hidden className="mr-2" /> {incomplete ? t("Apagar rascunho") : t("Arquivar")}
+            <Archive size={14} aria-hidden className="mr-2" /> {isArchived || incomplete ? t("Excluir definitivamente") : t("Arquivar")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -141,11 +141,11 @@ export function AgentRowMenu({ agent }: Props) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {incomplete ? t("Apagar rascunho") : t("Arquivar")} &ldquo;{agent.name}&rdquo;?
+              {isArchived || incomplete ? t("Excluir definitivamente") : t("Arquivar")} &ldquo;{agent.name}&rdquo;?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {incomplete
-                ? t("O rascunho sai da lista ativa. A remoção é segura e fica preservada no histórico de auditoria.")
+              {isArchived || incomplete
+                ? t("Esta ação remove definitivamente o agente, suas versões e execuções. Ela não pode ser desfeita; o registro da ação permanece na auditoria.")
                 : t("O agent deixa de responder gatilhos e some das listas ativas. Versões publicadas são preservadas para auditoria. Não é possível desarquivar pela UI nesta versão.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -153,10 +153,13 @@ export function AgentRowMenu({ agent }: Props) {
             <AlertDialogCancel>{t("Cancelar")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() =>
-                run(t("Agent arquivado."), () => archiveAgentAction(agent.id))
+                run(
+                  isArchived || incomplete ? t("Agente excluído definitivamente.") : t("Agente arquivado."),
+                  () => isArchived || incomplete ? deleteAgentAction(agent.id) : archiveAgentAction(agent.id),
+                )
               }
             >
-              {incomplete ? t("Apagar rascunho") : t("Arquivar")}
+              {isArchived || incomplete ? t("Excluir definitivamente") : t("Arquivar")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

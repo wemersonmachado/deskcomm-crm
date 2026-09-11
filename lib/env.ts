@@ -244,6 +244,11 @@ const schema = z.object({
   RESEND_API_KEY: z.string().optional().default(""),
   RESEND_FROM_EMAIL: z.string().optional().default(""),
 
+  // Asaas — usado somente no servidor para sincronizar links e validar webhook.
+  ASAAS_API_KEY: z.string().optional().default(""),
+  ASAAS_API_BASE_URL: z.string().url().optional().default("https://api.asaas.com/v3"),
+  ASAAS_WEBHOOK_TOKEN: z.string().optional().default(""),
+
   /**
    * E-mail de suporte que a instalação mostra ao CLIENTE FINAL (tela de conta
    * suspensa, tela de cobrança).

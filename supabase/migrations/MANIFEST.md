@@ -290,3 +290,4 @@ To re-apply on a fresh Supabase project, replay the migrations in version order 
 | `20260910020000` | `0234_propagacao_do_perfil_de_interface` | Troca o padrão visual e os vínculos que ainda o herdavam na mesma transação; configurações individuais divergentes são preservadas. |
 | `20260910110000` | `0235_provedores_llm_adicionais` | Catálogo publicável para Mistral, Groq e Cloudflare Workers AI; preços desconhecidos permanecem nulos, sem simular gratuidade. |
 | `20260910120000` | `0236_landing_page` | Conteúdo público editável da landing; coluna JSONB em platform_branding, sem alterar RLS. |
+| `20260910230000` | `0237_billing_asaas_e_exclusoes_definitivas` | Planos e eventos Asaas server-only; assinatura por organização; exclusão definitiva de agentes e função transacional para exclusão em lote de contatos, com RLS, grants mínimos e idempotência por evento. |

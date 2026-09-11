@@ -5,6 +5,7 @@ import { ROLE_RANK } from "@/lib/auth/types";
 import { emailDeSuporte } from "@/lib/branding/saida";
 import { Card } from "@/components/ui/card";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -23,18 +24,24 @@ export default async function BillingPage() {
   }
   const suporte = emailDeSuporte();
   const idioma = user.idioma;
+  const { data: subscriptionData } = await createAdminClient()
+    .from("organization_subscriptions" as never)
+    .select("plan_slug,status,value_cents,current_period_end" as never)
+    .eq("organization_id" as never, activeOrg.orgId)
+    .maybeSingle();
+  const subscription = subscriptionData as unknown as { plan_slug: string; status: string; value_cents: number; current_period_end: string | null } | null;
   return (
     <div className="flex h-full flex-col gap-6 p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Plano e cobrança</h1>
         <p className="text-sm text-muted-foreground">
           {traduzir("Planos, faturas e cobrança.", idioma)}
         </p>
       </header>
       <Card className="max-w-xl p-6">
-        <h2 className="text-sm font-semibold">{traduzir("Em breve — Fase 2", idioma)}</h2>
+        <h2 className="text-sm font-semibold">{subscription ? traduzir("Assinatura atual", idioma) : traduzir("Nenhuma assinatura vinculada", idioma)}</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          {traduzir("Billing entra na Fase 2 do roadmap.", idioma)}{" "}
+          {subscription ? <>{subscription.plan_slug.toUpperCase()} · {new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(subscription.value_cents/100)} · {subscription.status}</> : <>{traduzir("Escolha um plano na página inicial. Após a confirmação, o pagamento será conciliado com esta organização.", idioma)}</>} {" "}
           {suporte ? (
             <>
               {traduzir("Para questões de pagamento, contate", idioma)}{" "}

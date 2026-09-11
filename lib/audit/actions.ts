@@ -162,6 +162,7 @@ export const AUDIT_ACTIONS = [
   "ai_agent.created",
   "ai_agent.updated",
   "ai_agent.archived",
+  "ai_agent.deleted",
   "ai_agent.duplicated",
   "ai_agent.paused",
   "ai_agent.published",

@@ -73,3 +73,20 @@ export function gravarCanal(
   if (category === "message" && channel === "push") setAlertsEnabled(on);
   return next;
 }
+
+export function alertasDeMensagemSilenciados(): boolean {
+  const prefs = lerPrefs().message;
+  return !prefs.in_app && !prefs.push;
+}
+
+/** Controle único do Inbox: silencia bandeja e push de novas mensagens. */
+export function silenciarAlertasDeMensagem(silenciar: boolean): NotifyPrefs {
+  const next = lerPrefs();
+  next.message.in_app = !silenciar;
+  next.message.push = !silenciar;
+  if (typeof window !== "undefined") {
+    try { window.localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* armazenamento indisponível */ }
+  }
+  setAlertsEnabled(!silenciar);
+  return next;
+}
