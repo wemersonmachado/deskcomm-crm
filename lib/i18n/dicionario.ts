@@ -760,6 +760,7 @@ export const DICIONARIO: Traducoes = {
   "Mensagens anteriores que ele lê": { es: "Mensajes anteriores que lee" },
   "Tamanho máximo desse histórico": { es: "Tamaño máximo de ese historial" },
   "As instruções dele": { es: "Sus instrucciones" },
+  "Instruções do agente": { es: "Instrucciones del agente" },
   "Estilo de resposta": { es: "Estilo de respuesta" },
   "Responder em várias mensagens curtas (como uma pessoa digita)": {
     es: "Responder en varios mensajes cortos (como escribe una persona)",
