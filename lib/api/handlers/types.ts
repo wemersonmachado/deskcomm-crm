@@ -14,7 +14,9 @@ import type { ServiceBoundary } from "@/lib/atendimento/fronteira";
 import type { Idioma } from "@/lib/i18n/idiomas";
 
 export type Actor =
-  | { type: "user"; id: string; role?: string }
+  // Um usuário pode chegar por cookie ou por um bearer MCP emitido por ele. O
+  // token é mantido separado para o audit preservar a trilha da integração.
+  | { type: "user"; id: string; role?: string; api_token_id?: string }
   /**
    * ⚠️ `id` E `agent_id` NÃO SÃO A MESMA COISA, e confundi-los custa a atividade.
    *

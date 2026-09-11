@@ -175,6 +175,13 @@ async function destino(res: Response): Promise<string> {
 }
 
 describe("GET /api/v1/agenda/google/callback", () => {
+  it("a página-ponte usa o nonce da CSP para não ficar parada no retorno", async () => {
+    const { GET } = await import("@/app/api/v1/agenda/google/callback/route");
+    const req = pedido({ error: "access_denied" }, "ausente");
+    req.headers.set("x-nonce", "bm9uY2UtZG8tcHJveHk=");
+    const response = await GET(req);
+    expect(await response.text()).toContain('<script nonce="bm9uY2UtZG8tcHJveHk=">location.replace(');
+  });
   it("grava a conexão e volta dizendo que conectou", async () => {
     googleRespondendoBem();
     const res = await chamar({ code: "o-codigo", state: estadoValido() });

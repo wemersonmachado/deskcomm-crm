@@ -199,6 +199,19 @@ function adminDuble(agente: Record<string, unknown>, versoes: VersaoRow[]) {
 
 const PROMPT_NOVO = "Você é a recepção da clínica. Atenda com educação e agende.";
 
+it("somente o perfil externo marcado no banco permite rascunho sem canal", async () => {
+  for (const external of [false, true]) {
+    const versoes = [versao(1, "draft", "instrução anterior")];
+    const agente = { ...agenteCom(null), config: external ? { external_mcp_registration: { state: "registered" } } : {} };
+    vi.mocked(createAdminClient).mockReturnValue(adminDuble(agente, versoes) as never);
+    const result = await saveAgentDraftAction(AGENTE, {
+      ...VERSION_PAYLOAD, model: "external-runtime", credential_id: null, channel_session_id: null,
+    });
+    expect(result.ok).toBe(external);
+    expect(versoes[0]!.system_prompt).toBe(external ? PROMPT_NOVO : "instrução anterior");
+  }
+});
+
 const VERSION_PAYLOAD = {
   system_prompt: PROMPT_NOVO,
   provider: "anthropic",

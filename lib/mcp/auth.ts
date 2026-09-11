@@ -56,7 +56,7 @@ function scopesRole(scopes: string[]): Role {
   return "agent";
 }
 
-function deriveActor(scopes: string[], tokenId: string): Actor {
+export function deriveActor(scopes: string[], tokenId: string, createdByUserId: string): Actor {
   const isAiAgent = scopes.includes("actor:ai_agent");
   const role = scopesRole(scopes);
   if (isAiAgent) {
@@ -64,7 +64,12 @@ function deriveActor(scopes: string[], tokenId: string): Actor {
     const runId = runScope ? runScope.slice("agent_run:".length) : tokenId;
     return { type: "ai_agent", id: runId, role, api_token_id: tokenId };
   }
-  return { type: "user", id: tokenId, role };
+  // `contacts.created_by_user_id` (e `api_audit_log.actor_user_id`) referencia
+  // auth.users. O id do token também é UUID, mas não é um usuário e causa 23503
+  // para tokens MCP comuns criados pela interface. A autoria humana é a pessoa
+  // que emitiu o token; o token continua no ator para a auditoria distinguir a
+  // integração do uso por cookie.
+  return { type: "user", id: createdByUserId, role, api_token_id: tokenId };
 }
 
 export function extractBearer(authHeader: string | null): string | null {
@@ -91,7 +96,7 @@ export async function validateBearerToken(
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("api_tokens")
-    .select("id, organization_id, scopes, revoked_at, expires_at")
+    .select("id, organization_id, created_by, scopes, revoked_at, expires_at")
     .eq("token_hash", hashLiteral)
     .maybeSingle();
 
@@ -110,7 +115,7 @@ export async function validateBearerToken(
 
   const scopes = parseScopes(data.scopes);
   const role = scopesRole(scopes);
-  const actor = deriveActor(scopes, data.id);
+  const actor = deriveActor(scopes, data.id, data.created_by);
 
   supabase
     .from("api_tokens")

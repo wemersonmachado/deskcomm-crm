@@ -62,7 +62,13 @@ function actorAuditPayload(actor: Actor): {
   metadataActor: Record<string, unknown>;
 } {
   if (actor.type === "user") {
-    return { actorUserId: actor.id, metadataActor: { actor_type: "user" } };
+    return {
+      actorUserId: actor.id,
+      metadataActor: {
+        actor_type: "user",
+        ...(actor.api_token_id ? { actor_api_token_id: actor.api_token_id } : {}),
+      },
+    };
   }
   return {
     actorUserId: null,

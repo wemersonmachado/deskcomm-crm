@@ -97,7 +97,7 @@ export const dynamic = "force-dynamic";
  *
  * As 14 saídas herdam de graça, porque todas passam por aqui.
  */
-function voltar(parametro: string): NextResponse {
+function paginaDeVolta(parametro: string, nonce: string): NextResponse {
   const base = env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const destino = new URL(`/app/agenda?${parametro}`, base).toString();
   // Escapado mesmo o valor vindo de literais nossos: a ponte é genérica, e o
@@ -114,7 +114,7 @@ function voltar(parametro: string): NextResponse {
       `<noscript><meta http-equiv="refresh" content="0;url=${seguro}"></noscript>` +
       `<title>Voltando…</title></head><body>` +
       `<p>Voltando para a sua agenda…</p>` +
-      `<script>location.replace(${JSON.stringify(destino)})</script>` +
+      `<script nonce="${/^[A-Za-z0-9+/=]+$/.test(nonce) ? nonce : ""}">location.replace(${JSON.stringify(destino)})</script>` +
       `<noscript><p><a href="${seguro}">Continuar</a></p></noscript>` +
       `</body></html>`,
     { status: 200, headers: { "content-type": "text/html; charset=utf-8" } },
@@ -135,6 +135,9 @@ function voltar(parametro: string): NextResponse {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  // O proxy substitui este header em cada requisição; a ponte precisa do
+  // mesmo nonce para funcionar sob a CSP, sem liberar scripts inline gerais.
+  const voltar = (parametro: string) => paginaDeVolta(parametro, req.headers.get("x-nonce") ?? "");
   const url = new URL(req.url);
   const recusa = url.searchParams.get("error");
   const code = url.searchParams.get("code");

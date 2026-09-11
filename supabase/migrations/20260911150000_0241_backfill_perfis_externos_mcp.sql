@@ -12,6 +12,7 @@ begin
      where settings ->> 'ai_dispatch_mode' = 'external'
        and coalesce(settings -> 'external_agent' ->> 'configuration_source', 'external') = 'external'
        and nullif(settings -> 'external_agent' ->> 'agent_id', '') is null
+     for update
   loop
     insert into public.ai_agents (
       organization_id,

@@ -60,9 +60,11 @@ import {
 import {
   agentCreationDraftSchema,
   versionCreateSchema,
+  externalMcpVersionCreateSchema,
   agentMcpCreateSchema,
   agentMcpPatchSchema,
 } from "@/lib/ai/agents/validation";
+import { isExternalMcpRegistration } from "@/lib/mcp/external-configuration";
 import type { SelectableChannel as ChannelSessionLite } from "@/lib/channels/selectable";
 import type { AgentRow } from "@/hooks/ai/useAgent";
 import type { AgentVersionRow } from "@/hooks/ai/useAgentVersions";
@@ -292,10 +294,10 @@ function toVersionPayload(s: FormState) {
     provider: s.provider,
     model: s.model,
     // O token é da TELA; o contrato da versão é `null` = chave da instalação.
-    credential_id: s.credential_id === CHAVE_DA_INSTALACAO ? null : s.credential_id,
+    credential_id: s.credential_id === CHAVE_DA_INSTALACAO ? null : s.credential_id || null,
     tool_ids: s.tool_ids,
     trigger_config: s.trigger_config,
-    channel_session_id: s.channel_session_id,
+    channel_session_id: s.channel_session_id || null,
     max_steps: s.max_steps,
     token_budget: s.token_budget,
     cost_budget_cents: s.cost_budget_cents,
@@ -338,6 +340,7 @@ export function AgentForm(props: Props) {
   const materiais = props.materiais ?? [];
   const router = useRouter();
   const isEdit = props.mode === "edit";
+  const external = isEdit && isExternalMcpRegistration(props.agent.config);
   const readOnly = props.readOnly ?? false;
 
   const baseline = React.useMemo(() => {
@@ -416,24 +419,24 @@ export function AgentForm(props: Props) {
         `${t("As instruções têm")} ${tamanhoDoPrompt.toLocaleString("pt-BR")} ${t("caracteres, e o máximo é 20.000. Corte")} ` +
         `${(tamanhoDoPrompt - 20000).toLocaleString("pt-BR")} ${t("para conseguir salvar.")}`;
     if (!form.model) errors.model = t("Escolha o modelo de inteligência artificial.");
-    if (!form.credential_id)
+    if (!external && !form.credential_id)
       errors.credential_id = t("Escolha a chave de acesso da empresa de inteligência artificial.");
     // Escolher "a chave desta instalação" para um provedor que a instalação NÃO
     // tem seria publicar um agente que morre em toda mensagem. A mesma recusa
     // existe no servidor (rota de versões); aqui ela chega antes do clique.
     if (
-      form.credential_id === CHAVE_DA_INSTALACAO &&
+      !external && form.credential_id === CHAVE_DA_INSTALACAO &&
       !(props.provedoresDaInstalacao ?? []).includes(form.provider)
     )
       errors.credential_id = `${t("Esta instalação não tem chave de")} ${form.provider}. ${t("Escolha outra empresa de IA ou cadastre uma chave.")}`;
-    if (!form.channel_session_id)
+    if (!external && !form.channel_session_id)
       errors.channel_session_id = t("Escolha por qual número de WhatsApp ele atende.");
     if (form.tool_ids.length > TETO_TOOLS_POR_AGENTE)
       errors.tool_ids = `${t("Máximo de")} ${TETO_TOOLS_POR_AGENTE} ${t("capacidades por agente.")}`;
 
     // Tenta o schema completo:
     if (Object.keys(errors).length === 0) {
-      const parsed = versionCreateSchema.safeParse(toVersionPayload(form));
+      const parsed = (external ? externalMcpVersionCreateSchema : versionCreateSchema).safeParse(toVersionPayload(form));
       if (!parsed.success) {
         const flat = parsed.error.flatten();
         const first = Object.entries(flat.fieldErrors)[0];
@@ -441,7 +444,7 @@ export function AgentForm(props: Props) {
       }
     }
     return errors;
-  }, [form, props.provedoresDaInstalacao, t]);
+  }, [form, props.provedoresDaInstalacao, external, t]);
 
   const isValid = Object.keys(validation).length === 0;
   const pendingReasons = React.useMemo(() => {

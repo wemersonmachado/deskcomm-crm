@@ -20,7 +20,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 import { loginComoAdmin, lerCreds, type CredsE2E } from "./helpers/login-admin";
 
@@ -64,8 +64,14 @@ test.describe("Criar um agente pela tela", () => {
     // indicador de salvamento, sair e reabrir /new recupera o mesmo registro.
     const nomeParcial = `Rascunho persistente ${Date.now()}`;
     await page.locator("#name").fill(nomeParcial);
-    await expect(page.getByText(/salvando rascunho/i).first()).toBeVisible({ timeout: 5_000 });
+    // O estado transitório pode acabar entre dois polls; o dado persistido é
+    // a pós-condição. Aguarde a resposta do autosave e prove reabertura abaixo.
     await expect(page.getByText(/rascunho salvo/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(async () => {
+      const response = await page.request.get("/api/v1/ai/agents");
+      expect(response.ok()).toBe(true);
+      expect(JSON.stringify(await response.json())).toContain(nomeParcial);
+    }).toPass({ timeout: 15_000 });
     await page.goto("/app/ai/agents");
     await expect(page.getByText(nomeParcial).first()).toBeVisible();
     await expect(page.getByText(/configuração incompleta/i).first()).toBeVisible();

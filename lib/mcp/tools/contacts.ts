@@ -20,6 +20,37 @@ import type { McpToolDefinition } from "../types";
 import { CAMPOS_PROPONIVEIS, proporDadoDoContato } from "@/lib/contacts/proposta-de-dado";
 import { audit } from "@/lib/audit";
 
+/** Contrato MCP: nunca devolve identificadores internos, CPF/hash ou campos livres. */
+function publicContact(contact: {
+  id: string;
+  name: string | null;
+  display_name: string | null;
+  email: string | null;
+  phone_number: string | null;
+  tags: string[] | null;
+  source: string;
+  consent: Record<string, unknown> | null;
+  is_blocked: boolean;
+  is_anonymized: boolean;
+  created_at: string;
+  last_activity_at: string | null;
+}) {
+  return {
+    id: contact.id,
+    name: contact.name,
+    display_name: contact.display_name,
+    email: contact.email,
+    phone: contact.phone_number,
+    tags: contact.tags ?? [],
+    source: contact.source,
+    consent: contact.consent ?? {},
+    is_blocked: contact.is_blocked,
+    is_anonymized: contact.is_anonymized,
+    created_at: contact.created_at,
+    last_activity_at: contact.last_activity_at,
+  };
+}
+
 const searchInputShape = {
   query: z.string().min(1).max(200).describe("Termo de busca (nome, email ou telefone)."),
   limit: z.number().int().min(1).max(50).default(10),
@@ -88,21 +119,7 @@ export const crmGetContact: McpToolDefinition<typeof getInputShape> = {
       },
       { contactId: input.contact_id, decryptPurpose: null },
     );
-    return {
-      id: contact.id,
-      name: contact.name,
-      display_name: contact.display_name,
-      email: contact.email,
-      phone: contact.phone_number,
-      tags: contact.tags ?? [],
-      source: contact.source,
-      consent: contact.consent ?? {},
-      is_blocked: contact.is_blocked,
-      is_anonymized: contact.is_anonymized,
-      cpf_available: contact.cpf_available,
-      created_at: contact.created_at,
-      last_activity_at: contact.last_activity_at,
-    };
+    return { ...publicContact(contact), cpf_available: contact.cpf_available };
   },
 };
 
@@ -150,7 +167,7 @@ export const crmCreateContact: McpToolDefinition<typeof contactWriteShape> = {
       },
       parsed,
     );
-    return { contact: result.contact, action: result.action };
+    return { contact: publicContact(result.contact), action: result.action };
   },
 };
 
@@ -180,7 +197,7 @@ export const crmUpdateContact: McpToolDefinition<typeof contactUpdateShape> = {
       contact_id,
       parsed,
     );
-    return { contact };
+    return { contact: publicContact(contact) };
   },
 };
 
