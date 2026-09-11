@@ -3,13 +3,17 @@ import { describe, expect, it } from "vitest";
 import { PlanCta } from "./PlanCta";
 
 describe("CTA de contratação", () => {
-  it.each(["Standard", "Pro", "Enterprise"])("identifica %s sem simular compra", name => {
+  it.each(["Standard", "Pro", "Enterprise"])("leva %s ao checkout configurado", name => {
     const html = renderToStaticMarkup(<PlanCta name={name} destination="/#planos" />);
     expect(html).toContain(`Contratar ${name}`);
-    expect(html).toContain("Contratação online em preparação.");
-    expect(html).toContain("Nenhuma contratação ou cobrança foi realizada.");
-    expect(html).not.toContain("href=");
+    expect(html).toContain('href="/#planos"');
     expect(html).not.toContain("WhatsApp");
+  });
+  it("explica quando o checkout ainda não foi sincronizado", () => {
+    const html = renderToStaticMarkup(<PlanCta name="Standard" destination="" />);
+    expect(html).toContain("Checkout temporariamente indisponível.");
+    expect(html).toContain("Nenhuma cobrança foi realizada.");
+    expect(html).not.toContain("href=");
   });
   it("aceita o destino de contratação configurado pelo administrador", () => {
     const html = renderToStaticMarkup(<PlanCta name="Pro" destination="/checkout" />);

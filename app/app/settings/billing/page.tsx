@@ -6,6 +6,7 @@ import { emailDeSuporte } from "@/lib/branding/saida";
 import { Card } from "@/components/ui/card";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { tagDeIdioma } from "@/lib/i18n/datas";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function BillingPage() {
   return (
     <div className="flex h-full flex-col gap-6 p-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Plano e cobrança</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{traduzir("Plano e cobrança", idioma)}</h1>
         <p className="text-sm text-muted-foreground">
           {traduzir("Planos, faturas e cobrança.", idioma)}
         </p>
@@ -41,7 +42,7 @@ export default async function BillingPage() {
       <Card className="max-w-xl p-6">
         <h2 className="text-sm font-semibold">{subscription ? traduzir("Assinatura atual", idioma) : traduzir("Nenhuma assinatura vinculada", idioma)}</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          {subscription ? <>{subscription.plan_slug.toUpperCase()} · {new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(subscription.value_cents/100)} · {subscription.status}</> : <>{traduzir("Escolha um plano na página inicial. Após a confirmação, o pagamento será conciliado com esta organização.", idioma)}</>} {" "}
+          {subscription ? <>{subscription.plan_slug.toUpperCase()} · {new Intl.NumberFormat(tagDeIdioma(idioma),{style:"currency",currency:"BRL"}).format(subscription.value_cents/100)} · {subscription.status}</> : <>{traduzir("Escolha um plano na página inicial. Após a confirmação, o pagamento será conciliado com esta organização.", idioma)}</>} {" "}
           {suporte ? (
             <>
               {traduzir("Para questões de pagamento, contate", idioma)}{" "}

@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { DEFAULT_LANDING, landingSchema } from "./schema";
 import { canSee } from "@/lib/navigation/interface";
 describe("landing pública", () => {
-  it("valida os padrões e mantém preços identificados como ilustrativos", () => {
+  it("valida os padrões e mantém três planos contratáveis", () => {
     expect(landingSchema.safeParse(DEFAULT_LANDING).success).toBe(true);
-    expect(DEFAULT_LANDING.pricing_note).toContain("ilustrativos");
+    expect(DEFAULT_LANDING.pricing_note).toContain("contratação");
     expect(DEFAULT_LANDING.plans).toHaveLength(3);
+    expect(DEFAULT_LANDING.plans.every((plan) => plan.price_cents > 0)).toBe(true);
   });
   it.each(["javascript:alert(1)", "//evil.test", "/\\evil.test", "http://evil.test", "https://user:pass@example.com"])("recusa CTA inseguro %s", cta_url => {
     expect(landingSchema.safeParse({ ...DEFAULT_LANDING, cta_url }).success).toBe(false);
