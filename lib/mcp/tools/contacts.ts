@@ -12,7 +12,10 @@ import { z } from "zod";
 import {
   listContactsHandler,
   getContactHandler,
+  createContactHandler,
+  patchContactHandler,
 } from "@/app/api/v1/contacts/_handler";
+import { contactCreateSchema, contactPatchSchema } from "@/lib/schemas";
 import type { McpToolDefinition } from "../types";
 import { CAMPOS_PROPONIVEIS, proporDadoDoContato } from "@/lib/contacts/proposta-de-dado";
 import { audit } from "@/lib/audit";
@@ -100,6 +103,84 @@ export const crmGetContact: McpToolDefinition<typeof getInputShape> = {
       created_at: contact.created_at,
       last_activity_at: contact.last_activity_at,
     };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// crm_create_contact / crm_update_contact — escrita explícita no CRM
+// ---------------------------------------------------------------------------
+
+// CPF fica fora deste contrato de integração: é dado altamente sensível e o
+// agente externo não precisa recebê-lo para abrir ou manter um contato. Todo o
+// restante segue o mesmo handler usado pela interface e pela API REST.
+const contactWriteShape = {
+  name: z.string().min(1).max(200).optional(),
+  display_name: z.string().min(1).max(200).optional(),
+  email: z.string().email().optional(),
+  phone_number: z
+    .string()
+    .regex(/^\+\d{8,15}$/, "Telefone deve estar em formato E.164 (+5511999998888).")
+    .optional(),
+  birthdate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  tags: z.array(z.string().min(1).max(80)).max(100).optional(),
+  source_metadata: z.record(z.string(), z.unknown()).optional(),
+  consent: z.record(z.string(), z.unknown()).optional(),
+  custom_fields: z.record(z.string().min(1).max(80), z.unknown()).optional(),
+};
+
+export const crmCreateContact: McpToolDefinition<typeof contactWriteShape> = {
+  name: "crm_create_contact",
+  description:
+    "Cria um contato no CRM. Use telefone no formato E.164. O registro nasce com origem ai_agent e fica disponível imediatamente para criar ou associar uma oportunidade.",
+  inputSchema: contactWriteShape,
+  category: "write",
+  requiresRole: "ai_operator",
+  requiresScope: "mcp:write",
+  handler: async (input, ctx) => {
+    const parsed = contactCreateSchema.parse({
+      ...input,
+      source: "ai_agent",
+    });
+    const result = await createContactHandler(
+      ctx.supabase,
+      {
+        organization_id: ctx.organizationId,
+        actor: ctx.actor,
+        requestId: ctx.requestId,
+      },
+      parsed,
+    );
+    return { contact: result.contact, action: result.action };
+  },
+};
+
+const contactUpdateShape = {
+  contact_id: z.string().uuid().describe("UUID do contato a atualizar."),
+  ...contactWriteShape,
+};
+
+export const crmUpdateContact: McpToolDefinition<typeof contactUpdateShape> = {
+  name: "crm_update_contact",
+  description:
+    "Atualiza um contato existente da organização. Use crm_search_contacts antes quando só tiver nome, telefone ou e-mail. Não atualiza CPF por MCP.",
+  inputSchema: contactUpdateShape,
+  category: "write",
+  requiresRole: "ai_operator",
+  requiresScope: "mcp:write",
+  handler: async (input, ctx) => {
+    const { contact_id, ...patch } = input;
+    const parsed = contactPatchSchema.parse(patch);
+    const contact = await patchContactHandler(
+      ctx.supabase,
+      {
+        organization_id: ctx.organizationId,
+        actor: ctx.actor,
+        requestId: ctx.requestId,
+      },
+      contact_id,
+      parsed,
+    );
+    return { contact };
   },
 };
 

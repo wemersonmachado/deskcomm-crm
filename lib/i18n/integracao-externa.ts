@@ -29,6 +29,14 @@ export const INTEGRACAO_EXTERNA_ES = {
       es: "antes de atender. En modo plataforma, recibe instrucciones, herramientas y referencias de la versión publicada, sin credenciales. Debe interpretar este contrato; la plataforma no modifica automáticamente el código de su VPS. Los permisos, límites y protecciones de envío siguen siendo obligatorios.",
     },
   "Salvar configuração de integração": { es: "Guardar configuración de integración" },
+  "Externo via MCP": { es: "Externo mediante MCP" },
+  "Perfil interno do agente externo criado. Edite instruções, ferramentas e bases de conhecimento em": {
+    es: "Perfil interno del agente externo creado. Edite instrucciones, herramientas y bases de conocimiento en",
+  },
+  "Agentes de IA": { es: "Agentes de IA" },
+  "No modo externo, essas configurações ficam armazenadas na plataforma e só são entregues ao runtime quando você selecionar ‘Usar a configuração publicada na plataforma’.": {
+    es: "En el modo externo, estas configuraciones se guardan en la plataforma y solo se entregan al runtime cuando seleccione ‘Usar la configuración publicada en la plataforma’.",
+  },
   "Página de apresentação": { es: "Página de presentación" },
   "Conteúdo, aparência e planos do site público.": {
     es: "Contenido, apariencia y planes del sitio público.",

@@ -17,9 +17,10 @@ describe("contrato de configuração externa", () => {
     expect(externalConfigurationSchema.safeParse({ dispatch_mode: "external", configuration_source: "external", agent_id: null, organization_id: "outro" }).success).toBe(false);
   });
   it("não exporta instruções quando o dono escolheu preservar o externo", async () => {
-    const { ctx } = context([{ settings: { ai_dispatch_mode: "external" } }]);
+    const { ctx } = context([{ settings: { ai_dispatch_mode: "external", external_agent: { agent_id: "agent-a" } } }]);
     const result = await crmGetAgentConfiguration.handler({}, ctx) as Record<string, unknown>;
     expect(result.configuration).toBeNull();
+    expect(result.agent_id).toBe("agent-a");
   });
   it("cerca agente e versão na organização e usa projeção sem credenciais", async () => {
     const { ctx, chain } = context([{ settings: { external_agent: { configuration_source: "platform", agent_id: "agent-a" } } }, { id: "agent-a", name: "Assistente", published_version_id: "v1" }, { id: "v1", system_prompt: "Instrução publicada" }]);
