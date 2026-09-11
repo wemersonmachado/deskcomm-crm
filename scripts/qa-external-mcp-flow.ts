@@ -65,7 +65,10 @@ export async function validateExternalMcpFlow(page: Page, db: SupabaseClient, ba
     await expect(page.getByText("Externo via MCP", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Editar", exact: true }).click();
     await page.locator("#name").fill(name);
-    await page.locator("#system_prompt").fill(prompt);
+    // O prompt é um textarea sem id: use o controle real, não um seletor
+    // inventado, para que esta prova cubra o mesmo campo que o usuário edita.
+    const promptField = page.locator("textarea").first();
+    await promptField.fill(prompt);
     await page.getByRole("button", { name: "Salvar rascunho", exact: true }).click();
     await expect.poll(async () => {
       const result = await db.from("ai_agent_versions").select("system_prompt")
@@ -77,7 +80,7 @@ export async function validateExternalMcpFlow(page: Page, db: SupabaseClient, ba
     await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
     await page.reload();
     await expect(page.locator("#name")).toHaveValue(name);
-    await expect(page.locator("#system_prompt")).toHaveValue(prompt);
+    await expect(promptField).toHaveValue(prompt);
     // Perfil configurado não é prova de runtime online; publicação nativa segue protegida.
     await expect(page.getByRole("button", { name: /^Publicar/ })).toBeDisabled();
     expect((await readProfiles())[0]!.is_active).toBe(false);
