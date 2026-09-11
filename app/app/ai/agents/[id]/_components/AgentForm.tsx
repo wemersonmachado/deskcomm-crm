@@ -371,6 +371,10 @@ export function AgentForm(props: Props) {
   const [papel, setPapel] = React.useState<"conversa" | "operacao" | "seguranca">("conversa");
 
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
+  // Não use o objeto inteiro de props como dependência do autosave. Ele pode
+  // ganhar uma nova identidade durante a reconciliação do Server Component e
+  // cancelar o timer que guarda o texto que acabou de ser digitado.
+  const agentId = isEdit ? props.agent.id : null;
   const isCreationDraft =
     isEdit &&
     !props.draft &&
@@ -461,12 +465,12 @@ export function AgentForm(props: Props) {
   }, [validation, t]);
 
   React.useEffect(() => {
-    if (!isCreationDraft || !dirty || readOnly || creationCompletedRef.current) return;
+    if (!agentId || !isCreationDraft || !dirty || readOnly || creationCompletedRef.current) return;
     if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
     setAutomaticSave("saving");
     automaticSaveTimer.current = setTimeout(async () => {
       const result = await saveAgentCreationDraftAction(
-        props.agent.id,
+        agentId,
         toCreationDraftPayload(form),
       );
       if (result.ok) {
@@ -481,7 +485,7 @@ export function AgentForm(props: Props) {
     return () => {
       if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
     };
-  }, [dirty, form, isCreationDraft, props, readOnly]);
+  }, [agentId, dirty, form, isCreationDraft, readOnly]);
 
   const publishBlockReason = React.useMemo(() => {
     if (!isEdit) return t("Salve o agent antes de publicar.");
