@@ -274,6 +274,7 @@ export const AUDIT_ACTIONS = [
   "auth.email_change_requested",
   "auth.email_change_request_failed",
   "tenant.created_by_signup",
+  "tenant.created_by_payment",
   "tenant.created_by_recovery",
   "conversation.snoozed",
   "conversation.snooze_cancelled",
