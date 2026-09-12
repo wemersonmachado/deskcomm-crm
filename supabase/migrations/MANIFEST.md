@@ -291,3 +291,7 @@ To re-apply on a fresh Supabase project, replay the migrations in version order 
 | `20260910110000` | `0235_provedores_llm_adicionais` | Catálogo publicável para Mistral, Groq e Cloudflare Workers AI; preços desconhecidos permanecem nulos, sem simular gratuidade. |
 | `20260910120000` | `0236_landing_page` | Conteúdo público editável da landing; coluna JSONB em platform_branding, sem alterar RLS. |
 | `20260910230000` | `0237_billing_asaas_e_exclusoes_definitivas` | Planos e eventos Asaas server-only; assinatura por organização; exclusão definitiva de agentes e função transacional para exclusão em lote de contatos, com RLS, grants mínimos e idempotência por evento. |
+| `20260911120000` | `0238_acesso_apos_pagamento` | Pagamento confirmado provisiona uma única organização/assinatura e um convite idempotente; e-mail fica fora do banco, somente hash, e renovação não duplica tenant. |
+| `20260911130000` | `0239_precos_modelos_adicionais` | Preço oficial de Mistral e Cloudflare Workers AI entra em `ai_models` e `ai_pricing`, impedindo custo zero por NULL na instalação fresca. |
+| `20260911140000` | `0240_perfil_externo_sem_canal` | Um perfil de agente externo MCP pode nascer como rascunho antes de a organização conectar um canal local. A publicação continua validando a sessão e não habilita execução nativa sem canal. |
+| `20260911150000` | `0241_backfill_perfis_externos_mcp` | Integrações MCP externas já salvas ganham perfil rascunho visível em Agentes, sem duplicar nem armazenar bearer no perfil. |

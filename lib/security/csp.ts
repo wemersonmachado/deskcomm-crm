@@ -8,7 +8,10 @@ export function contentSecurityPolicy(nonce: string, supabaseUrl: string, produc
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${production ? "" : " 'unsafe-eval'"}`,
     // Radix, posicionamento e cores white-label usam style inline, não scripts inline.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' https: data: blob:",
+    // O Storage é configurável no self-host e o E2E o sobe em HTTP local. A
+    // origem explícita mantém a exceção limitada ao Supabase desta instalação;
+    // liberar `http:` aceitaria qualquer servidor HTTP da rede.
+    `img-src 'self' https: ${database.origin} data: blob:`,
     "media-src 'self' https: blob:",
     "font-src 'self' data:",
     `connect-src 'self' ${database.origin} ${websocket.origin} https://*.ingest.sentry.io https://*.ingest.us.sentry.io${production ? "" : " ws: http://localhost:*"}`,

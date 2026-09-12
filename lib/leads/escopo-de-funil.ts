@@ -118,6 +118,10 @@ export const ALVO_DE_FUNIL: Record<string, AlvoDeFunil> = {
   crm_resume_ai_attendance: "sem_funil",
   crm_save_org_memory: "sem_funil",
   crm_propose_contact_field: "sem_funil",
+  // Cadastro de cliente não cria, move nem altera um card; a organização do
+  // contato continua vindo exclusivamente do token MCP e do handler canônico.
+  crm_create_contact: "sem_funil",
+  crm_update_contact: "sem_funil",
   // Configuração da casa. Já não é alcançável pelo agente (papel acima do dele);
   // entram aqui para o teste de vacuidade não as acusar, e com a nota de que a
   // barreira delas é OUTRA.

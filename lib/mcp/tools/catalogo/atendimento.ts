@@ -35,6 +35,26 @@ export const TOOLS_ATENDIMENTO = declararTools([
     pacotes: ["atender", "vender"],
   },
   {
+    name: "crm_create_contact",
+    category: "write",
+    rotulo: "Cadastrar cliente",
+    explicacao:
+      "Cria a ficha de um novo cliente com os dados que ele informou, para que o atendimento e as oportunidades não fiquem sem cadastro.",
+    oQueToca: "Cadastro de clientes",
+    risco: "atencao",
+    pacotes: ["atender"],
+  },
+  {
+    name: "crm_update_contact",
+    category: "write",
+    rotulo: "Atualizar ficha do cliente",
+    explicacao:
+      "Atualiza dados de contato e marcadores de um cliente já cadastrado, mantendo o histórico e a origem do atendimento.",
+    oQueToca: "Cadastro de clientes",
+    risco: "atencao",
+    pacotes: ["atender"],
+  },
+  {
     name: "crm_propose_contact_field",
     category: "write",
     // SEM `description` aqui, e não por esquecimento: o catálogo perdeu esse

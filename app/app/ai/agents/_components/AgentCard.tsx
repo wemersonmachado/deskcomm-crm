@@ -8,6 +8,7 @@ import { useT } from "@/hooks/i18n/useT";
 import type { AgentRow } from "@/hooks/ai/useAgent";
 import { AgentStatusBadge, deriveAgentStatus } from "./AgentStatusBadge";
 import { AgentRowMenu } from "./AgentRowMenu";
+import { isExternalMcpRegistration } from "@/lib/mcp/external-configuration";
 
 interface Props {
   agent: AgentRow;
@@ -57,6 +58,7 @@ export function AgentCard({ agent, canWrite }: Props) {
   const status = deriveAgentStatus(agent);
   const incomplete =
     (agent.config?.creation_draft as { state?: unknown } | undefined)?.state === "incomplete";
+  const externalMcp = isExternalMcpRegistration(agent.config);
 
   return (
     <Card className="flex h-full flex-col gap-3 p-4">
@@ -83,6 +85,7 @@ export function AgentCard({ agent, canWrite }: Props) {
             </Badge>
           )}
           <AgentStatusBadge status={status} />
+          {externalMcp && <Badge variant="outline">{t("Externo via MCP")}</Badge>}
           {incomplete && <Badge variant="outline">{t("Configuração incompleta")}</Badge>}
           {canWrite && <AgentRowMenu agent={agent} />}
         </div>

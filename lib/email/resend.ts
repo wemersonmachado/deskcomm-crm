@@ -41,6 +41,8 @@ interface SendArgs {
    * Ausente usa o endereço puro: quem não passa marca não ganha a nossa.
    */
   fromName?: string;
+  /** Mantém retries do mesmo efeito sem duplicar mensagens no provedor. */
+  idempotencyKey?: string;
 }
 
 interface SendResult {
@@ -94,27 +96,27 @@ export async function sendEmail(args: SendArgs): Promise<SendResult> {
 
   if (!client || !from) {
     if (process.env.NODE_ENV !== "production") {
-      logger.warn(
-        "[email] envio desligado — falta RESEND_API_KEY ou RESEND_FROM_EMAIL",
-        {
-          tem_chave: client !== null,
-          tem_remetente: from !== null,
-        },
-      );
+      logger.warn("[email] envio desligado — falta RESEND_API_KEY ou RESEND_FROM_EMAIL", {
+        tem_chave: client !== null,
+        tem_remetente: from !== null,
+      });
     }
     return { ok: false, error: "not_configured" };
   }
 
   try {
-    const { data, error } = await client.emails.send({
-      from,
-      to: args.to,
-      subject: args.subject,
-      html: args.html,
-      text: args.text,
-      replyTo: args.replyTo,
-      tags: args.tags,
-    });
+    const { data, error } = await client.emails.send(
+      {
+        from,
+        to: args.to,
+        subject: args.subject,
+        html: args.html,
+        text: args.text,
+        replyTo: args.replyTo,
+        tags: args.tags,
+      },
+      args.idempotencyKey ? { idempotencyKey: args.idempotencyKey } : undefined,
+    );
 
     if (error) {
       return {

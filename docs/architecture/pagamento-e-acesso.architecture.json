@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Pagamento confirmado e primeiro acesso",
+    "subtitle": "Plano publicado, confirmação financeira, convite idempotente e senha criada pelo titular",
+    "output": "pagamento-e-acesso.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    { "id": "pessoa", "label": "Pessoa" },
+    { "id": "app", "label": "Aplicativo" },
+    { "id": "integracoes", "label": "Dados e integrações" }
+  ],
+  "mainPath": ["landing", "asaas", "webhook", "provisionar", "resend", "senha", "app"],
+  "nodes": [
+    { "id": "landing", "lane": "pessoa", "col": 0, "type": "ui", "label": "Landing › Contratar plano", "sublabel": "link e valor publicados pelo painel" },
+    { "id": "asaas", "lane": "integracoes", "col": 1, "type": "external", "label": "Checkout Asaas", "sublabel": "cobrança recorrente; callback só orienta o navegador" },
+    { "id": "webhook", "lane": "app", "col": 2, "type": "service", "label": "POST /api/v1/webhooks/asaas", "sublabel": "token em tempo constante, Zod e evento minimizado" },
+    { "id": "plano", "lane": "integracoes", "col": 3, "type": "database", "label": "platform_billing_plans", "sublabel": "link ativo e valor em centavos são a fonte de verdade" },
+    { "id": "provisionar", "lane": "app", "col": 4, "type": "service", "label": "fn_provision_paid_checkout", "sublabel": "lock, conciliação exata e tenant único por compra" },
+    { "id": "recibo", "lane": "integracoes", "col": 5, "type": "database", "label": "platform_checkout_access", "sublabel": "recibo e hash do e-mail; sem PII aberta" },
+    { "id": "resend", "lane": "integracoes", "col": 6, "type": "external", "label": "Resend", "sublabel": "convite com chave de idempotência" },
+    { "id": "senha", "lane": "pessoa", "col": 7, "type": "ui", "label": "Convite › Criar senha", "sublabel": "token HMAC de 24h, e-mail fixado" },
+    { "id": "app", "lane": "pessoa", "col": 8, "type": "ui", "label": "Organização ativa", "sublabel": "aceite cria vínculo admin e abre sessão" },
+    { "id": "audit", "lane": "app", "col": 5, "type": "service", "label": "Audit log", "sublabel": "tenant criado, convite emitido e aceite" }
+  ],
+  "edges": [
+    { "from": "landing", "to": "asaas", "label": "abre checkout" },
+    { "from": "asaas", "to": "webhook", "label": "confirma pagamento" },
+    { "from": "webhook", "to": "plano", "label": "confere link e valor" },
+    { "from": "plano", "to": "provisionar", "label": "elegível" },
+    { "from": "provisionar", "to": "recibo", "label": "persiste antes do e-mail" },
+    { "from": "recibo", "to": "resend", "label": "envia ou retenta" },
+    { "from": "resend", "to": "senha", "label": "entrega link assinado" },
+    { "from": "senha", "to": "app", "label": "cria senha e aceita" },
+    { "from": "provisionar", "to": "audit", "label": "registra criação" },
+    { "from": "senha", "to": "audit", "label": "registra aceite" },
+    { "from": "audit", "to": "webhook", "label": "falha gera retentativa observável" }
+  ]
+}

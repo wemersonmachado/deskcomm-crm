@@ -60,9 +60,11 @@ import {
 import {
   agentCreationDraftSchema,
   versionCreateSchema,
+  externalMcpVersionCreateSchema,
   agentMcpCreateSchema,
   agentMcpPatchSchema,
 } from "@/lib/ai/agents/validation";
+import { isExternalMcpRegistration } from "@/lib/mcp/external-configuration";
 import type { SelectableChannel as ChannelSessionLite } from "@/lib/channels/selectable";
 import type { AgentRow } from "@/hooks/ai/useAgent";
 import type { AgentVersionRow } from "@/hooks/ai/useAgentVersions";
@@ -292,10 +294,10 @@ function toVersionPayload(s: FormState) {
     provider: s.provider,
     model: s.model,
     // O token é da TELA; o contrato da versão é `null` = chave da instalação.
-    credential_id: s.credential_id === CHAVE_DA_INSTALACAO ? null : s.credential_id,
+    credential_id: s.credential_id === CHAVE_DA_INSTALACAO ? null : s.credential_id || null,
     tool_ids: s.tool_ids,
     trigger_config: s.trigger_config,
-    channel_session_id: s.channel_session_id,
+    channel_session_id: s.channel_session_id || null,
     max_steps: s.max_steps,
     token_budget: s.token_budget,
     cost_budget_cents: s.cost_budget_cents,
@@ -338,6 +340,7 @@ export function AgentForm(props: Props) {
   const materiais = props.materiais ?? [];
   const router = useRouter();
   const isEdit = props.mode === "edit";
+  const external = isEdit && isExternalMcpRegistration(props.agent.config);
   const readOnly = props.readOnly ?? false;
 
   const baseline = React.useMemo(() => {
@@ -358,8 +361,10 @@ export function AgentForm(props: Props) {
   const [automaticSave, setAutomaticSave] = React.useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
+  const [, startTransition] = React.useTransition();
   const creationCompletedRef = React.useRef(false);
   const automaticSaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formRef = React.useRef<FormState>(baseline);
   /**
    * Qual papel está aberto. Estado LOCAL e não rota: trocar de papel não é
    * navegação — o rascunho é um só, e uma URL por papel faria o usuário achar
@@ -368,6 +373,10 @@ export function AgentForm(props: Props) {
   const [papel, setPapel] = React.useState<"conversa" | "operacao" | "seguranca">("conversa");
 
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
+  // Não use o objeto inteiro de props como dependência do autosave. Ele pode
+  // ganhar uma nova identidade durante a reconciliação do Server Component e
+  // cancelar o timer que guarda o texto que acabou de ser digitado.
+  const agentId = isEdit ? props.agent.id : null;
   const isCreationDraft =
     isEdit &&
     !props.draft &&
@@ -375,8 +384,45 @@ export function AgentForm(props: Props) {
     (props.agent.config?.creation_draft as { state?: unknown } | undefined)?.state ===
       "incomplete";
 
+  /**
+   * O autosave é disparado pelo mesmo evento que altera o formulário. Antes,
+   * ele dependia de um efeito posterior ao render. Em uma navegação rápida
+   * (inclusive o clique para sair do editor) aquele efeito podia ser limpo
+   * antes de armar o timer e o rascunho ficava com os valores iniciais.
+   */
+  const scheduleCreationDraftSave = React.useCallback(
+    (nextForm: FormState) => {
+      if (!agentId || !isCreationDraft || readOnly || creationCompletedRef.current) return;
+      if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
+      setAutomaticSave("saving");
+      automaticSaveTimer.current = setTimeout(() => {
+        // Server Actions chamadas fora de um submit/evento React precisam de
+        // transition. Sem esse contexto, o navegador atualiza o campo, mas a
+        // chamada assíncrona do timer não é despachada pelo Next.
+        startTransition(async () => {
+          const result = await saveAgentCreationDraftAction(
+            agentId,
+            toCreationDraftPayload(nextForm),
+          );
+          if (result.ok) {
+            setAutomaticSave("saved");
+          } else if (result.error === "draft_already_completed") {
+            creationCompletedRef.current = true;
+            setAutomaticSave("saved");
+          } else {
+            setAutomaticSave("error");
+          }
+        });
+      }, 800);
+    },
+    [agentId, isCreationDraft, readOnly, startTransition],
+  );
+
   function patch(p: Partial<FormState>) {
-    setForm((prev) => ({ ...prev, ...p }));
+    const next = { ...formRef.current, ...p };
+    formRef.current = next;
+    setForm(next);
+    scheduleCreationDraftSave(next);
   }
 
   // Quando provider muda, limpa credential e modelo (eles dependem do provider).
@@ -416,24 +462,24 @@ export function AgentForm(props: Props) {
         `${t("As instruções têm")} ${tamanhoDoPrompt.toLocaleString("pt-BR")} ${t("caracteres, e o máximo é 20.000. Corte")} ` +
         `${(tamanhoDoPrompt - 20000).toLocaleString("pt-BR")} ${t("para conseguir salvar.")}`;
     if (!form.model) errors.model = t("Escolha o modelo de inteligência artificial.");
-    if (!form.credential_id)
+    if (!external && !form.credential_id)
       errors.credential_id = t("Escolha a chave de acesso da empresa de inteligência artificial.");
     // Escolher "a chave desta instalação" para um provedor que a instalação NÃO
     // tem seria publicar um agente que morre em toda mensagem. A mesma recusa
     // existe no servidor (rota de versões); aqui ela chega antes do clique.
     if (
-      form.credential_id === CHAVE_DA_INSTALACAO &&
+      !external && form.credential_id === CHAVE_DA_INSTALACAO &&
       !(props.provedoresDaInstalacao ?? []).includes(form.provider)
     )
       errors.credential_id = `${t("Esta instalação não tem chave de")} ${form.provider}. ${t("Escolha outra empresa de IA ou cadastre uma chave.")}`;
-    if (!form.channel_session_id)
+    if (!external && !form.channel_session_id)
       errors.channel_session_id = t("Escolha por qual número de WhatsApp ele atende.");
     if (form.tool_ids.length > TETO_TOOLS_POR_AGENTE)
       errors.tool_ids = `${t("Máximo de")} ${TETO_TOOLS_POR_AGENTE} ${t("capacidades por agente.")}`;
 
     // Tenta o schema completo:
     if (Object.keys(errors).length === 0) {
-      const parsed = versionCreateSchema.safeParse(toVersionPayload(form));
+      const parsed = (external ? externalMcpVersionCreateSchema : versionCreateSchema).safeParse(toVersionPayload(form));
       if (!parsed.success) {
         const flat = parsed.error.flatten();
         const first = Object.entries(flat.fieldErrors)[0];
@@ -441,7 +487,7 @@ export function AgentForm(props: Props) {
       }
     }
     return errors;
-  }, [form, props.provedoresDaInstalacao, t]);
+  }, [form, props.provedoresDaInstalacao, external, t]);
 
   const isValid = Object.keys(validation).length === 0;
   const pendingReasons = React.useMemo(() => {
@@ -458,27 +504,10 @@ export function AgentForm(props: Props) {
   }, [validation, t]);
 
   React.useEffect(() => {
-    if (!isCreationDraft || !dirty || readOnly || creationCompletedRef.current) return;
-    if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
-    setAutomaticSave("saving");
-    automaticSaveTimer.current = setTimeout(async () => {
-      const result = await saveAgentCreationDraftAction(
-        props.agent.id,
-        toCreationDraftPayload(form),
-      );
-      if (result.ok) {
-        setAutomaticSave("saved");
-      } else if (result.error === "draft_already_completed") {
-        creationCompletedRef.current = true;
-        setAutomaticSave("saved");
-      } else {
-        setAutomaticSave("error");
-      }
-    }, 800);
     return () => {
       if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
     };
-  }, [dirty, form, isCreationDraft, props, readOnly]);
+  }, []);
 
   const publishBlockReason = React.useMemo(() => {
     if (!isEdit) return t("Salve o agent antes de publicar.");
@@ -572,6 +601,7 @@ export function AgentForm(props: Props) {
   }
 
   function handleReset() {
+    formRef.current = baseline;
     setForm(baseline);
   }
 
@@ -1061,6 +1091,8 @@ export function AgentForm(props: Props) {
               </div>
             </div>
             <Textarea
+              data-testid="agent-system-prompt"
+              aria-label={t("Instruções do agente")}
               value={form.system_prompt}
               onChange={(e) => patch({ system_prompt: e.target.value })}
               disabled={disabled}

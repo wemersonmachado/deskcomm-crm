@@ -10,8 +10,8 @@ const ctx = {
   organizationId: "bcc12320-f555-4fef-8d90-38a0ac5950e0",
   apiTokenId: "d7ba0e68-0000-4000-8000-000000000001",
   requestId: "req-1",
-  // Um token comum vira actor.type='user' com id = id do TOKEN (lib/mcp/auth.ts).
-  actor: { type: "user", id: "d7ba0e68-0000-4000-8000-000000000001", role: "manager" },
+  // Token MCP comum conserva o usuário que o emitiu; o token continua separado.
+  actor: { type: "user", id: "d7ba0e68-0000-4000-8000-000000000002", role: "manager" },
 } as unknown as McpContext;
 
 describe("auditMcpToolCall", () => {
@@ -30,13 +30,14 @@ describe("auditMcpToolCall", () => {
     expect(e.metadata.tool_name).toBe("crm_create_lead");
   });
 
-  it("não manda id de token em actorUserId (FK para auth.users)", async () => {
+  it("usa o emitente real e conserva o token na trilha de auditoria", async () => {
     await auditMcpToolCall({
       ctx, toolName: "crm_list_leads", args: {}, durationMs: 5, success: true,
     });
     const e = auditSpy.mock.calls[0]![0];
-    expect(e.actorUserId).toBeNull();
+    expect(e.actorUserId).toBe(ctx.actor.id);
     expect(e.actorApiTokenId).toBe(ctx.apiTokenId);
+    expect(e.metadata.actor_api_token_id).toBe(ctx.apiTokenId);
   });
 
   it("escreve os campos de que o painel de uso depende para ler", async () => {

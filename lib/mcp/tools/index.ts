@@ -9,7 +9,13 @@
 import type { McpToolDefinition } from "../types";
 import { crmGetAgentConfiguration } from "./agent-configuration";
 import { TOOL_CATALOG, VALID_TOOL_IDS } from "./catalog";
-import { crmSearchContacts, crmGetContact, crmProposeContactField } from "./contacts";
+import {
+  crmSearchContacts,
+  crmGetContact,
+  crmCreateContact,
+  crmUpdateContact,
+  crmProposeContactField,
+} from "./contacts";
 import {
   crmListConversations,
   crmGetConversation,
@@ -96,6 +102,8 @@ export const allTools: ReadonlyArray<McpToolDefinition> = [
   crmListAppointments,
   crmSearchContacts,
   crmGetContact,
+  crmCreateContact,
+  crmUpdateContact,
   crmProposeContactField,
   crmListConversations,
   crmGetConversation,

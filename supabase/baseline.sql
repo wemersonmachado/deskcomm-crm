@@ -23639,6 +23639,228 @@ revoke all on function public.fn_record_asaas_event(text,text,text,text,text,int
 notify pgrst,'reload schema';
 -- END 0237_billing_asaas_e_exclusoes_definitivas
 
+-- BEGIN 0238_acesso_apos_pagamento
+create table if not exists public.platform_checkout_access (
+  purchase_key text primary key,
+  provider_payment_id text not null,
+  provider_subscription_id text,
+  provider_customer_id text not null,
+  organization_id uuid not null unique references public.organizations(id) on delete cascade,
+  invite_id uuid not null unique,
+  issued_at bigint not null,
+  email_hash text not null check (email_hash ~ '^[0-9a-f]{64}$'),
+  email_sent_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.platform_checkout_access enable row level security;
+revoke all on public.platform_checkout_access from public, anon, authenticated;
+grant select, insert, update, delete on public.platform_checkout_access to service_role;
+
+create or replace function public.fn_provision_paid_checkout(
+  p_payment_id text,
+  p_subscription_id text,
+  p_customer_id text,
+  p_payment_link_id text,
+  p_value_cents integer,
+  p_customer_name text,
+  p_email_hash text
+) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_purchase_key text := coalesce(nullif(p_subscription_id, ''), 'payment:' || p_payment_id);
+  v_plan public.platform_billing_plans%rowtype;
+  v_access public.platform_checkout_access%rowtype;
+  v_org public.organizations%rowtype;
+begin
+  if p_payment_id is null or p_customer_id is null or p_payment_link_id is null
+    or p_value_cents is null or p_customer_name is null or p_email_hash is null then
+    return jsonb_build_object('eligible', false, 'reason', 'missing_required_data');
+  end if;
+  if p_email_hash !~ '^[0-9a-f]{64}$' then
+    return jsonb_build_object('eligible', false, 'reason', 'invalid_email_hash');
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended('paid-checkout:' || v_purchase_key, 0));
+  select * into v_access from public.platform_checkout_access where purchase_key = v_purchase_key;
+  if found then
+    select display_name into v_org.display_name from public.organizations where id = v_access.organization_id;
+    select name into v_plan.name
+      from public.organization_subscriptions s
+      join public.platform_billing_plans p on p.slug = s.plan_slug
+      where s.organization_id = v_access.organization_id;
+    return jsonb_build_object(
+      'eligible', true, 'created', false,
+      'organization_id', v_access.organization_id,
+      'organization_name', v_org.display_name,
+      'plan_name', v_plan.name,
+      'invite_id', v_access.invite_id,
+      'issued_at', v_access.issued_at,
+      'email_sent_at', v_access.email_sent_at
+    );
+  end if;
+
+  select * into v_plan from public.platform_billing_plans
+    where asaas_payment_link_id = p_payment_link_id and active;
+  if not found then
+    return jsonb_build_object('eligible', false, 'reason', 'unknown_or_inactive_payment_link');
+  end if;
+  if v_plan.price_cents <> p_value_cents then
+    return jsonb_build_object('eligible', false, 'reason', 'payment_value_mismatch');
+  end if;
+
+  insert into public.organizations(display_name, slug, legal_name, status, settings, created_by)
+  values (
+    left(trim(p_customer_name), 120),
+    'xgo-' || substr(md5(p_customer_id || ':' || v_purchase_key), 1, 24),
+    left(trim(p_customer_name), 255),
+    'active',
+    jsonb_build_object(
+      'plan', v_plan.slug,
+      'interface_default', jsonb_build_object('preset', 'completa')
+    ),
+    null
+  ) returning * into v_org;
+
+  insert into public.organization_subscriptions(
+    organization_id, plan_slug, provider_customer_id, provider_subscription_id,
+    provider_payment_id, status, value_cents
+  ) values (
+    v_org.id, v_plan.slug, p_customer_id, nullif(p_subscription_id, ''),
+    p_payment_id, 'active', p_value_cents
+  );
+
+  insert into public.platform_checkout_access(
+    purchase_key, provider_payment_id, provider_subscription_id, provider_customer_id,
+    organization_id, invite_id, issued_at, email_hash
+  ) values (
+    v_purchase_key, p_payment_id, nullif(p_subscription_id, ''), p_customer_id,
+    v_org.id, gen_random_uuid(), floor(extract(epoch from now()))::bigint, p_email_hash
+  ) returning * into v_access;
+
+  return jsonb_build_object(
+    'eligible', true, 'created', true,
+    'organization_id', v_org.id,
+    'organization_name', v_org.display_name,
+    'plan_name', v_plan.name,
+    'invite_id', v_access.invite_id,
+    'issued_at', v_access.issued_at,
+    'email_sent_at', null
+  );
+end;
+$$;
+
+revoke all on function public.fn_provision_paid_checkout(text,text,text,text,integer,text,text)
+  from public, anon, authenticated;
+grant execute on function public.fn_provision_paid_checkout(text,text,text,text,integer,text,text)
+  to service_role;
+
+notify pgrst, 'reload schema';
+-- END 0238_acesso_apos_pagamento
+
+-- BEGIN 0239_precos_modelos_adicionais
+-- Preços oficiais dos modelos publicados em 0235. Nunca deixe NULL aqui: a
+-- instalação fresca precisa do mesmo teto de orçamento que uma instalação já
+-- atualizada.
+update public.ai_models
+   set input_price_per_million_cents = case
+         when provider = 'mistral' and model_id = 'mistral-small-latest' then 15
+         when provider = 'mistral' and model_id = 'mistral-large-latest' then 50
+         when provider = 'cloudflare' and model_id = '@cf/openai/gpt-oss-20b' then 20
+         when provider = 'cloudflare' and model_id = '@cf/openai/gpt-oss-120b' then 35
+       end,
+       output_price_per_million_cents = case
+         when provider = 'mistral' and model_id = 'mistral-small-latest' then 60
+         when provider = 'mistral' and model_id = 'mistral-large-latest' then 150
+         when provider = 'cloudflare' and model_id = '@cf/openai/gpt-oss-20b' then 30
+         when provider = 'cloudflare' and model_id = '@cf/openai/gpt-oss-120b' then 75
+       end
+ where (provider, model_id) in (
+   ('mistral', 'mistral-small-latest'),
+   ('mistral', 'mistral-large-latest'),
+   ('cloudflare', '@cf/openai/gpt-oss-20b'),
+   ('cloudflare', '@cf/openai/gpt-oss-120b')
+ );
+
+insert into public.ai_pricing
+  (model, prompt_cents_per_million_tokens, completion_cents_per_million_tokens, notes)
+values
+  ('mistral-small-latest', 15, 60, 'catálogo Mistral; conferido em 2026-09-11'),
+  ('mistral-large-latest', 50, 150, 'catálogo Mistral; conferido em 2026-09-11'),
+  ('@cf/openai/gpt-oss-20b', 20, 30, 'catálogo Cloudflare Workers AI; conferido em 2026-09-11'),
+  ('@cf/openai/gpt-oss-120b', 35, 75, 'catálogo Cloudflare Workers AI; conferido em 2026-09-11')
+on conflict (model) do update set
+  prompt_cents_per_million_tokens = excluded.prompt_cents_per_million_tokens,
+  completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,
+  notes = excluded.notes,
+  superseded_at = null;
+-- END 0239_precos_modelos_adicionais
+
+-- BEGIN 0240_perfil_externo_sem_canal
+-- O agente MCP externo é registrado e configurável antes de haver um canal
+-- local. A publicação mantém a sua própria validação de canal conectado.
+alter table public.ai_agent_versions
+  alter column channel_session_id drop not null;
+-- END 0240_perfil_externo_sem_canal
+
+-- BEGIN 0241_backfill_perfis_externos_mcp
+-- Um update de instalação já existente pode ter integração MCP externa sem o
+-- perfil visual. Materializa-o sem copiar token algum para o perfil.
+do $baseline_backfill_external_mcp$
+declare
+  org record;
+  perfil_id uuid;
+begin
+  for org in
+    select id, settings
+      from public.organizations
+     where settings ->> 'ai_dispatch_mode' = 'external'
+       and coalesce(settings -> 'external_agent' ->> 'configuration_source', 'external') = 'external'
+       and nullif(settings -> 'external_agent' ->> 'agent_id', '') is null
+     for update
+  loop
+    insert into public.ai_agents (
+      organization_id, name, description, model, system_prompt, kind,
+      priority, is_active, is_default, config
+    ) values (
+      org.id,
+      'Agente externo (MCP)',
+      'Runtime externo conectado por MCP.',
+      'external-runtime',
+      'Este perfil representa um agente executado fora da plataforma. Configure aqui as instruções, capacidades e memória que desejar manter no CRM.',
+      'mcp_agent', 0, false, false,
+      jsonb_build_object(
+        'external_mcp_registration',
+        jsonb_build_object('state', 'registered', 'created_by', 'migration_0241')
+      )
+    ) returning id into perfil_id;
+
+    insert into public.ai_agent_versions (
+      organization_id, agent_id, version_number, system_prompt, provider,
+      model, credential_id, channel_session_id, status
+    ) values (
+      org.id, perfil_id, 1,
+      'Este perfil representa um agente executado fora da plataforma. Configure aqui as instruções, capacidades e memória que desejar manter no CRM.',
+      'anthropic', 'external-runtime', null, null, 'draft'
+    );
+
+    update public.organizations
+       set settings = jsonb_set(
+         coalesce(org.settings, '{}'::jsonb),
+         '{external_agent}',
+         case when jsonb_typeof(org.settings -> 'external_agent') = 'object'
+           then org.settings -> 'external_agent'
+           else '{}'::jsonb
+         end
+           || jsonb_build_object('agent_id', perfil_id::text),
+         true
+       )
+     where id = org.id;
+  end loop;
+end;
+$baseline_backfill_external_mcp$;
+-- END 0241_backfill_perfis_externos_mcp
+
 -- ---- VARREDURA anon: toda função security definer criada no apêndice acima ----
 -- Último bloco de propósito: ALTER DEFAULT PRIVILEGES do dump pode fazer uma
 -- função nova nascer executável por anon durante UPDATE.

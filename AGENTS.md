@@ -47,19 +47,19 @@ pelo dono da VPS. Como o número é decidido: [`docs/doctrine/versionamento.md`]
 
 ## Estrutura que importa
 
-| Path | O quê |
-|---|---|
-| `app/api/v1/` | 166 route handlers REST (versionado por path) — 169 contando `app/api/**` |
-| `app/api/internal/`, `app/api/mcp/`, `app/api/v1/cron/` | superfícies não-cookie (secret/bearer próprio) |
-| `app/app/` | UI autenticada do tenant · `app/admin/` UI de plataforma |
-| `app/actions/` | Server Actions (auth, onboarding, team, settings) |
-| `lib/agent-engine/`, `lib/ai/` | runtime do agente, guardrails, RAG, dispatcher |
-| `lib/api/wrappers.ts` | `ok()` / `fail()` — **use sempre**, não monte Response na mão |
-| `lib/auth/require-role.ts` | `requireRole()` — guard canônico de RBAC |
-| `lib/supabase/{browser,server,admin}.ts` | clients canônicos |
-| `workers/` | workers de `event_log` + crons |
-| `supabase/migrations/` | schema versionado · `supabase/baseline.sql` = o que o self-host aplica |
-| `proxy.ts` | middleware do Next 16 (auth de borda, `X-Request-Id`) |
+| Path                                                    | O quê                                                                     |
+| ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `app/api/v1/`                                           | 166 route handlers REST (versionado por path) — 169 contando `app/api/**` |
+| `app/api/internal/`, `app/api/mcp/`, `app/api/v1/cron/` | superfícies não-cookie (secret/bearer próprio)                            |
+| `app/app/`                                              | UI autenticada do tenant · `app/admin/` UI de plataforma                  |
+| `app/actions/`                                          | Server Actions (auth, onboarding, team, settings)                         |
+| `lib/agent-engine/`, `lib/ai/`                          | runtime do agente, guardrails, RAG, dispatcher                            |
+| `lib/api/wrappers.ts`                                   | `ok()` / `fail()` — **use sempre**, não monte Response na mão             |
+| `lib/auth/require-role.ts`                              | `requireRole()` — guard canônico de RBAC                                  |
+| `lib/supabase/{browser,server,admin}.ts`                | clients canônicos                                                         |
+| `workers/`                                              | workers de `event_log` + crons                                            |
+| `supabase/migrations/`                                  | schema versionado · `supabase/baseline.sql` = o que o self-host aplica    |
+| `proxy.ts`                                              | middleware do Next 16 (auth de borda, `X-Request-Id`)                     |
 
 ## Comandos (CONFIRMADO em `package.json`)
 
@@ -93,9 +93,10 @@ git show origin/main:.github/workflows/e2e.yml | grep -A4 'FORA_DO_CI:'
 ```
 
 O que continua verdade e é o que importa: `vps-fresh-onboarding` está entre elas (WAHA + Redis
-+ Resend + Nuvemshop) e é a **P0** da doutrina de QA — ou seja, `e2e` verde não prova a jornada
-de instalação fresca. `followup-journey`, `webhooks` e `capacidades-do-agente` estiveram fora e
-**voltaram**: rodam hoje (`e2e.yml`, listas `SPECS_PARTE_*` — são três desde 2026-09-07).
+
+- Resend + Nuvemshop) e é a **P0** da doutrina de QA — ou seja, `e2e` verde não prova a jornada
+  de instalação fresca. `followup-journey`, `webhooks` e `capacidades-do-agente` estiveram fora e
+  **voltaram**: rodam hoje (`e2e.yml`, listas `SPECS_PARTE_*` — são três desde 2026-09-07).
 
 `.github/workflows/publish-image.yml`: `imagens-ok` = as três imagens Docker constroem. **Obrigatório
 desde 2026-08-13.**
@@ -197,8 +198,8 @@ Medido em 2026-08-14 @ `741c4ec8`, com o comando ao lado de cada número:
 - **1 das 46 specs E2E segue fora do CI** (`vps-fresh-onboarding`), e o `e2e` **é** check
   obrigatório desde 2026-08-08. Ou seja: um PR que quebre o `e2e` não entra — mas a jornada de
   instalação fresca, que é o produto que se vende, continua sem gate. Se você mexeu nela, a
-  prova é sua. *(Corrigido em 2026-08-14; a redação anterior — "4 das 32, não-obrigatório" —
-  mudava a régua de qualquer triagem que a lesse.)*
+  prova é sua. _(Corrigido em 2026-08-14; a redação anterior — "4 das 32, não-obrigatório" —
+  mudava a régua de qualquer triagem que a lesse.)_
 - Rate limit HTTP: `lib/auth/rate-limit.ts` cobre **login, signup, recuperação de senha e
   aceite de convite** (contando por IP **e** por identificador hasheado); `checkRateLimit` cobre
   o webhook de captação e o dispatcher de IA. **Crons e MCP seguem sem.** Meça antes de agir:
@@ -260,6 +261,19 @@ Este repositório tem PRDs, specs, regras de negócio e doutrina escritos
 Se a regra não está escrita, diga que não está e pergunte — não preencha a lacuna com
 suposição plausível. Ao documentar, marque o que é `CONFIRMADO` (provado por código) e o
 que é `INFERIDO`.
+
+## Um único checkout operacional
+
+Este projeto é operado somente pelo diretório raiz `DeskComm`. **Não crie worktree,
+clone paralelo, pasta `-isolated` ou cópia do repositório** sem autorização explícita do
+proprietário. Isso divide commits, migrations, evidências, deploy e credenciais entre
+linhas concorrentes.
+
+Antes de qualquer edição, validação, commit ou deploy, rode `pnpm workspace:guard`.
+Ele falha se o Git detectar mais de uma worktree. O único uso aceitável de
+`ALLOW_MULTIPLE_WORKTREES=1` é uma recuperação já autorizada e temporária, seguindo
+[`docs/runbooks/checkouts-e-worktrees.md`](docs/runbooks/checkouts-e-worktrees.md):
+checkpoint, consolidação no checkout principal, validação e remoção imediata da cópia.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
