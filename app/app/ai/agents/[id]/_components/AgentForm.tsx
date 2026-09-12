@@ -363,6 +363,7 @@ export function AgentForm(props: Props) {
   >("idle");
   const creationCompletedRef = React.useRef(false);
   const automaticSaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formRef = React.useRef<FormState>(baseline);
   /**
    * Qual papel está aberto. Estado LOCAL e não rota: trocar de papel não é
    * navegação — o rascunho é um só, e uma URL por papel faria o usuário achar
@@ -382,8 +383,40 @@ export function AgentForm(props: Props) {
     (props.agent.config?.creation_draft as { state?: unknown } | undefined)?.state ===
       "incomplete";
 
+  /**
+   * O autosave é disparado pelo mesmo evento que altera o formulário. Antes,
+   * ele dependia de um efeito posterior ao render. Em uma navegação rápida
+   * (inclusive o clique para sair do editor) aquele efeito podia ser limpo
+   * antes de armar o timer e o rascunho ficava com os valores iniciais.
+   */
+  const scheduleCreationDraftSave = React.useCallback(
+    (nextForm: FormState) => {
+      if (!agentId || !isCreationDraft || readOnly || creationCompletedRef.current) return;
+      if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
+      setAutomaticSave("saving");
+      automaticSaveTimer.current = setTimeout(async () => {
+        const result = await saveAgentCreationDraftAction(
+          agentId,
+          toCreationDraftPayload(nextForm),
+        );
+        if (result.ok) {
+          setAutomaticSave("saved");
+        } else if (result.error === "draft_already_completed") {
+          creationCompletedRef.current = true;
+          setAutomaticSave("saved");
+        } else {
+          setAutomaticSave("error");
+        }
+      }, 800);
+    },
+    [agentId, isCreationDraft, readOnly],
+  );
+
   function patch(p: Partial<FormState>) {
-    setForm((prev) => ({ ...prev, ...p }));
+    const next = { ...formRef.current, ...p };
+    formRef.current = next;
+    setForm(next);
+    scheduleCreationDraftSave(next);
   }
 
   // Quando provider muda, limpa credential e modelo (eles dependem do provider).
@@ -465,27 +498,10 @@ export function AgentForm(props: Props) {
   }, [validation, t]);
 
   React.useEffect(() => {
-    if (!agentId || !isCreationDraft || !dirty || readOnly || creationCompletedRef.current) return;
-    if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
-    setAutomaticSave("saving");
-    automaticSaveTimer.current = setTimeout(async () => {
-      const result = await saveAgentCreationDraftAction(
-        agentId,
-        toCreationDraftPayload(form),
-      );
-      if (result.ok) {
-        setAutomaticSave("saved");
-      } else if (result.error === "draft_already_completed") {
-        creationCompletedRef.current = true;
-        setAutomaticSave("saved");
-      } else {
-        setAutomaticSave("error");
-      }
-    }, 800);
     return () => {
       if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
     };
-  }, [agentId, dirty, form, isCreationDraft, readOnly]);
+  }, []);
 
   const publishBlockReason = React.useMemo(() => {
     if (!isEdit) return t("Salve o agent antes de publicar.");
@@ -579,6 +595,7 @@ export function AgentForm(props: Props) {
   }
 
   function handleReset() {
+    formRef.current = baseline;
     setForm(baseline);
   }
 
