@@ -25,6 +25,7 @@ build/
 # pode ser apagado com seguranca a qualquer momento. Sem aspas de propósito:
 # gitignore não as interpreta como delimitador, e viraria parte do padrão.
 API GITHUB.txt
+API GITHUB-NÃO APAGAR.txt
 
 # Testing & coverage
 coverage/
