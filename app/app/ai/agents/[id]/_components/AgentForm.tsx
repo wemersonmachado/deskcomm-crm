@@ -361,6 +361,7 @@ export function AgentForm(props: Props) {
   const [automaticSave, setAutomaticSave] = React.useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
+  const [, startTransition] = React.useTransition();
   const creationCompletedRef = React.useRef(false);
   const automaticSaveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const formRef = React.useRef<FormState>(baseline);
@@ -394,22 +395,27 @@ export function AgentForm(props: Props) {
       if (!agentId || !isCreationDraft || readOnly || creationCompletedRef.current) return;
       if (automaticSaveTimer.current) clearTimeout(automaticSaveTimer.current);
       setAutomaticSave("saving");
-      automaticSaveTimer.current = setTimeout(async () => {
-        const result = await saveAgentCreationDraftAction(
-          agentId,
-          toCreationDraftPayload(nextForm),
-        );
-        if (result.ok) {
-          setAutomaticSave("saved");
-        } else if (result.error === "draft_already_completed") {
-          creationCompletedRef.current = true;
-          setAutomaticSave("saved");
-        } else {
-          setAutomaticSave("error");
-        }
+      automaticSaveTimer.current = setTimeout(() => {
+        // Server Actions chamadas fora de um submit/evento React precisam de
+        // transition. Sem esse contexto, o navegador atualiza o campo, mas a
+        // chamada assíncrona do timer não é despachada pelo Next.
+        startTransition(async () => {
+          const result = await saveAgentCreationDraftAction(
+            agentId,
+            toCreationDraftPayload(nextForm),
+          );
+          if (result.ok) {
+            setAutomaticSave("saved");
+          } else if (result.error === "draft_already_completed") {
+            creationCompletedRef.current = true;
+            setAutomaticSave("saved");
+          } else {
+            setAutomaticSave("error");
+          }
+        });
       }, 800);
     },
-    [agentId, isCreationDraft, readOnly],
+    [agentId, isCreationDraft, readOnly, startTransition],
   );
 
   function patch(p: Partial<FormState>) {
