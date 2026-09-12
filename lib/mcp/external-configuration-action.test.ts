@@ -12,16 +12,44 @@ describe("gravação das opções MCP", () => {
     expect(await saveExternalAgentConfiguration({})).toHaveProperty("error");
     expect(mocks.db).not.toHaveBeenCalled();
   });
-  it("serializa JSON no CAS e preserva a marca/interface existentes", async () => {
+  it("registra um perfil MCP sem segredo, faz CAS e preserva marca/interface", async () => {
     const settings = { branding: { name: "Preservar" }, interface: { preset: "simplificada" } };
-    const chain = { select: vi.fn(), eq: vi.fn(), update: vi.fn(), single: vi.fn(), maybeSingle: vi.fn() };
-    chain.select.mockReturnValue(chain); chain.eq.mockReturnValue(chain); chain.update.mockReturnValue(chain);
-    chain.single.mockResolvedValue({ data: { settings }, error: null });
-    chain.maybeSingle.mockResolvedValue({ data: { id: "org-a" }, error: null });
-    mocks.db.mockReturnValue({ from: vi.fn(() => chain) });
-    expect(await saveExternalAgentConfiguration({ dispatch_mode: "external", configuration_source: "external", agent_id: null })).toEqual({ success: true });
-    expect(chain.eq).toHaveBeenCalledWith("settings", JSON.stringify(settings));
-    expect(chain.eq).toHaveBeenCalledWith("id", "org-a");
-    expect(chain.update).toHaveBeenCalledWith({ settings: { ...settings, ai_dispatch_mode: "external", external_agent: { configuration_source: "external", agent_id: null } } });
+    const org = { select: vi.fn(), eq: vi.fn(), update: vi.fn(), single: vi.fn(), maybeSingle: vi.fn() };
+    const agents = { insert: vi.fn(), select: vi.fn(), single: vi.fn(), delete: vi.fn(), eq: vi.fn() };
+    const versions = { insert: vi.fn() };
+    org.select.mockReturnValue(org); org.eq.mockReturnValue(org); org.update.mockReturnValue(org);
+    org.single.mockResolvedValue({ data: { settings }, error: null });
+    org.maybeSingle.mockResolvedValue({ data: { id: "org-a" }, error: null });
+    agents.insert.mockReturnValue(agents); agents.select.mockReturnValue(agents); agents.delete.mockReturnValue(agents); agents.eq.mockReturnValue(agents);
+    agents.single.mockResolvedValue({ data: { id: "agent-a" }, error: null });
+    versions.insert.mockResolvedValue({ error: null });
+    const from = vi.fn((table: string) => table === "organizations" ? org : table === "ai_agents" ? agents : versions);
+    mocks.db.mockReturnValue({ from });
+
+    expect(await saveExternalAgentConfiguration({ dispatch_mode: "external", configuration_source: "external", agent_id: null })).toEqual({ success: true, agent_id: "agent-a" });
+    expect(org.eq).toHaveBeenCalledWith("settings", JSON.stringify(settings));
+    expect(org.eq).toHaveBeenCalledWith("id", "org-a");
+    expect(org.update).toHaveBeenCalledWith({ settings: { ...settings, ai_dispatch_mode: "external", external_agent: { configuration_source: "external", agent_id: "agent-a" } } });
+    expect(agents.insert).toHaveBeenCalledWith(expect.objectContaining({
+      organization_id: "org-a", kind: "mcp_agent", model: "external-runtime",
+    }));
+    expect(versions.insert).toHaveBeenCalledWith(expect.objectContaining({
+      agent_id: "agent-a", channel_session_id: null, status: "draft",
+    }));
+    expect(JSON.stringify(agents.insert.mock.calls)).not.toContain("dsk_");
+  });
+
+  it("reutiliza o perfil externo já vinculado sem criar outro", async () => {
+    const settings = { external_agent: { configuration_source: "external", agent_id: "11111111-1111-1111-1111-111111111111" } };
+    const org = { select: vi.fn(), eq: vi.fn(), update: vi.fn(), single: vi.fn(), maybeSingle: vi.fn() };
+    org.select.mockReturnValue(org); org.eq.mockReturnValue(org); org.update.mockReturnValue(org);
+    org.single.mockResolvedValue({ data: { settings }, error: null });
+    org.maybeSingle.mockResolvedValue({ data: { id: "org-a" }, error: null });
+    const from = vi.fn(() => org);
+    mocks.db.mockReturnValue({ from });
+
+    expect(await saveExternalAgentConfiguration({ dispatch_mode: "external", configuration_source: "external", agent_id: null })).toEqual({ success: true, agent_id: "11111111-1111-1111-1111-111111111111" });
+    expect(from).toHaveBeenCalledWith("organizations");
+    expect(from).not.toHaveBeenCalledWith("ai_agent_versions");
   });
 });

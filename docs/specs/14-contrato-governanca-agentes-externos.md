@@ -65,6 +65,8 @@ handler; nenhuma tool de governança do catálogo ficou de fora deste contrato.
 |---|---|---|---|---|---|
 | `crm_search_contacts` | read | L21 | `contacts.ts` | não (busca genérica) | fora do escopo |
 | `crm_get_contact` | read | L22 | `contacts.ts` | não (leitura genérica) | fora do escopo |
+| `crm_create_contact` | write | atendimento | `contacts.ts` | não (CRUD de contato) | fora do escopo |
+| `crm_update_contact` | write | atendimento | `contacts.ts` | não (CRUD de contato) | fora do escopo |
 | `crm_list_conversations` | read | L23 | `conversations.ts:31` | **sim** (assignee_kind, tags, queue_position) | §3.5 |
 | `crm_get_conversation` | read | L24 | `conversations.ts:94` | **sim** | §3.5 |
 | `crm_get_conversation_history` | read | L25 | `conversations.ts:148` | adjacente (contexto de mensagens) | §3.5 (menção) |
@@ -105,6 +107,16 @@ atendimento. `crm_send_whatsapp_message` não é de governança, mas as proibiç
   governança — é injetado do ctx.
 - **Erros** são strings de código (ex.: `conversation_not_found`,
   `assignment_conflict`, `target_not_found`) — sem PII (LGPD).
+
+### 2.1 Cadastro de contatos por agente externo
+
+`crm_create_contact` e `crm_update_contact` usam os mesmos handlers canônicos
+da API e da interface. Exigem `mcp:write` e um token com papel operacional
+(`role:manager`, que satisfaz o piso `ai_operator`). A organização vem apenas
+do bearer; `contact_id` é sempre conferido pelo handler com
+`organization_id`. O CPF não faz parte do contrato MCP, para não transferir
+esse dado sensível ao runtime externo. Para criar, use telefone E.164
+(`+5522...`) e o sistema registra a origem como `ai_agent`.
 
 ---
 

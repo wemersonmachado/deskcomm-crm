@@ -31,7 +31,10 @@ import {
   PUBLISH_ERROR_CODES,
   versionCreateSchema,
   versionPatchSchema,
+  externalMcpVersionCreateSchema,
+  externalMcpVersionPatchSchema,
 } from "@/lib/ai/agents/validation";
+import { isExternalMcpRegistration } from "@/lib/mcp/external-configuration";
 import { publishAgentVersion } from "@/lib/ai/agents/publish";
 import { escolherVersoesDaTela } from "@/lib/ai/agents/versoes-da-tela";
 import { VALID_TOOL_IDS } from "@/lib/mcp/tools";
@@ -321,14 +324,6 @@ export async function saveAgentDraftAction(
   if (!guard.ok) return guard;
   const { authUser, activeOrg } = guard;
 
-  const parsed = versionCreateSchema.safeParse(payload);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: "validation_failed",
-      details: parsed.error.flatten(),
-    };
-  }
   // Validado ANTES de qualquer escrita, junto do resto. Se o cadastro fosse
   // conferido depois, uma ordem inválida devolveria erro com a versão já
   // gravada; se fosse GRAVADO antes, um escopo inválido devolveria erro com o
@@ -341,7 +336,6 @@ export async function saveAgentDraftAction(
     return { ok: false, error: "validation_failed", details: cadastroParsed.error.flatten() };
   }
 
-  const v = parsed.data;
   const requestId = randomUUID();
   const admin = createAdminClient();
 
@@ -354,6 +348,16 @@ export async function saveAgentDraftAction(
     .maybeSingle();
   if (!agent) return { ok: false, error: "not_found" };
   if (agent.archived_at) return { ok: false, error: "agent_archived" };
+
+  // Só o marcador lido do banco autoriza rascunho externo sem canal local.
+  // O cliente não pode converter um agente nativo por campos do payload.
+  const external = isExternalMcpRegistration(agent.config);
+  const schema = external ? externalMcpVersionCreateSchema : versionCreateSchema;
+  const parsed = schema.safeParse(payload);
+  if (!parsed.success) {
+    return { ok: false, error: "validation_failed", details: parsed.error.flatten() };
+  }
+  const v = parsed.data;
 
   // O escopo aponta para coisas que EXISTEM nesta organização. Marcar um
   // material apagado (ou de outra organização) produz uma configuração muda: a
@@ -413,7 +417,7 @@ export async function saveAgentDraftAction(
 
   if (existingDraft) {
     // PATCH na draft existente — não infla a sequência de versions.
-    const patchValidated = versionPatchSchema.safeParse(payload);
+    const patchValidated = (external ? externalMcpVersionPatchSchema : versionPatchSchema).safeParse(payload);
     if (!patchValidated.success) {
       return { ok: false, error: "validation_failed", details: patchValidated.error.flatten() };
     }

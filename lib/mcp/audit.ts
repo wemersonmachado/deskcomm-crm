@@ -56,17 +56,14 @@ export async function auditMcpToolCall(input: AuditMcpToolCallInput): Promise<vo
 
   if (resultSummary) metadata.result_summary = resultSummary.slice(0, 280);
   if (errorMessage) metadata.error = errorMessage.slice(0, 500);
-  if (ctx.actor.type === "ai_agent" && ctx.actor.api_token_id) {
-    metadata.actor_api_token_id = ctx.actor.api_token_id;
-  }
+  // Mesmo token para ator humano (emitente do bearer) ou IA: a coluna e os
+  // metadados mantêm a trilha da integração, enquanto actor_user_id só recebe
+  // uma FK real para auth.users.
+  metadata.actor_api_token_id = ctx.apiTokenId;
 
   await audit({
     action: "mcp.tool_called",
-    // Quem age via MCP é um TOKEN, nunca uma linha de auth.users: para um token
-    // comum, ctx.actor.id é o id do próprio token (lib/mcp/auth.ts), e mandá-lo
-    // como actorUserId estourava a FK api_audit_log_actor_user_id_fkey. O ator
-    // já fica registrado em actorApiTokenId e em metadata.actor_id.
-    actorUserId: null,
+    actorUserId: ctx.actor.type === "user" ? ctx.actor.id : null,
     actorApiTokenId: ctx.apiTokenId,
     organizationId: ctx.organizationId,
     resourceType: "mcp_tool",

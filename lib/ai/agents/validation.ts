@@ -171,6 +171,15 @@ export type VersionInput = z.infer<typeof versionShapeSchema>;
 export const versionCreateSchema = versionShapeSchema;
 
 /**
+ * Perfil de runtime MCP externo pode manter o rascunho antes de existir um
+ * canal local. A publicação segue validando canal conectado no banco.
+ */
+export const externalMcpVersionCreateSchema = versionShapeSchema.extend({
+  channel_session_id: UUID.nullable(),
+});
+export const externalMcpVersionPatchSchema = externalMcpVersionCreateSchema.partial();
+
+/**
  * Estado parcial do assistente enquanto a primeira versão ainda não existe.
  *
  * O editor precisa aceitar campos ainda vazios (modelo/canal/credencial), mas

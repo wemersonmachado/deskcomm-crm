@@ -23,6 +23,7 @@ import * as path from "node:path";
 import { test, expect, type Page } from "@playwright/test";
 
 import { TETO_TOOLS_POR_AGENTE } from "@/lib/mcp/tools/selecao-por-pacote";
+import { TOOL_CATALOG } from "@/lib/mcp/tools/catalog";
 
 import { loginComoAdmin } from "./helpers/login-admin";
 
@@ -227,7 +228,11 @@ test.describe("Configurar o que o agente pode fazer", () => {
     // não permitia fazer, sem dizer por quê. Agora recusa e diz quantas vagas
     // faltam, e o operador faz o que a própria tela manda.
     await page.getByTestId("switch-pacote-atender").click();
-    await expect(page.getByTestId("aviso-teto")).toContainText(/faltam? 1 vaga/);
+    const aviso = page.getByTestId("aviso-teto");
+    await expect(aviso).toContainText(/faltam? \d+ vagas?/);
+    const faltam = Number((await aviso.innerText()).match(/faltam? (\d+) vagas?/)?.[1]);
+    expect(faltam).toBeGreaterThan(0);
+    expect(faltam).toBeLessThanOrEqual(TOOLS_DO_SEED.length);
     await expect(
       page.getByTestId("pacote-atender"),
       "recusar significa NÃO aplicar: pacote meio-ligado seria o pior dos dois mundos",
@@ -236,10 +241,14 @@ test.describe("Configurar o que o agente pode fazer", () => {
     // Libera a vaga desligando uma capacidade que o seed tinha ligado.
     await page.getByTestId("toggle-avancado").click();
     await page.getByTestId("lista-avancada").waitFor({ state: "visible" });
-    await page
-      .getByTestId(`capacidade-${TOOLS_DO_SEED[2]}`)
-      .locator("input[type=checkbox]")
-      .click();
+    // O catálogo cresce: libere a quantidade EXATA que a própria tela pediu,
+    // preservando a prova de recusa e a reserva para a capacidade crítica.
+    const foraDoPacote = TOOLS_DO_SEED.filter(tool =>
+      !TOOL_CATALOG.find(entry => entry.name === tool)?.pacotes.includes("atender"));
+    expect(foraDoPacote.length).toBeGreaterThanOrEqual(faltam);
+    for (const tool of foraDoPacote.slice(0, faltam)) {
+      await page.getByTestId(`capacidade-${tool}`).locator("input[type=checkbox]").uncheck();
+    }
     await page.getByTestId("toggle-avancado").click();
 
     await page.getByTestId("switch-pacote-atender").click();

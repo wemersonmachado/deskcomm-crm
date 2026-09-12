@@ -124,7 +124,11 @@ test.describe("rbac role matrix (spec 13 §4)", () => {
     await expectNoBlockingA11y(page);
 
     await page.goto("/app/settings/billing");
-    await expect(page.getByRole("heading", { name: "Billing" })).toBeVisible();
+    // A tela é localizada pela sessão do usuário: o contrato que o admin
+    // acessa é o título atual de cobrança, não o antigo rótulo interno em
+    // inglês. A asserção continua provando que o redirect para /403 não
+    // aconteceu e que a superfície de billing foi realmente renderizada.
+    await expect(page.getByRole("heading", { name: "Plano e cobrança" })).toBeVisible();
     await expectNoBlockingA11y(page);
   });
 

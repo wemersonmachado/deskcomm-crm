@@ -14,6 +14,11 @@ describe("CSP de runtime", () => {
   it("mantém instalação HTTP local e não força HTTPS em todos os subdomínios", () => {
     const csp = contentSecurityPolicy("test", "http://localhost:54321", false);
     expect(csp).toContain("ws://localhost:54321");
+    // O logo vem do bucket público do Storage. No ambiente local ele está em
+    // outra origem HTTP, então `img-src` precisa aceitar somente esta origem,
+    // nunca o esquema `http:` inteiro.
+    expect(csp).toContain("img-src 'self' https: http://localhost:54321 data: blob:");
+    expect(csp).not.toContain("img-src 'self' https: http: data: blob:");
     expect(csp).toContain("'unsafe-eval'");
     expect(csp).not.toContain("upgrade-insecure-requests");
   });
