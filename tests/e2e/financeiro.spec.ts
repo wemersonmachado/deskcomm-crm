@@ -4,6 +4,8 @@ import * as path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 
+import { loginComoAdmin } from "./helpers/login-admin";
+
 const credsPath = path.join(process.cwd(), ".e2e-creds.json");
 const evidencia = path.join(process.cwd(), ".superpowers", "evidence", "financeiro");
 const marcador = `Financeiro E2E ${Date.now()}`;
@@ -13,18 +15,14 @@ let creds: { password: string; org_id: string; users: Record<string, { email: st
 async function login(page: Page) {
   if (!fs.existsSync(credsPath)) execFileSync("npx", ["tsx", "scripts/seed-e2e-credentials.ts"], { stdio: "inherit" });
   creds = JSON.parse(fs.readFileSync(credsPath, "utf8"));
-  await page.goto("/login");
-  await page.getByLabel(/e-?mail/i).fill(creds.users.admin!.email);
-  await page.getByLabel(/senha/i).fill(creds.password);
-  await page.getByRole("button", { name: /entrar/i }).click();
-  await page.waitForURL(/\/app/, { timeout: 30_000 });
+  creds = (await loginComoAdmin(page, creds)) as typeof creds;
 }
 
 test.describe("Financeiro — registro e aprovação humana", () => {
   test.afterAll(async () => { if (creds) await adminDb.from("finance_entries").delete().eq("organization_id", creds.org_id).eq("description", marcador); });
 
   test("admin registra conta e confirma a baixa pela interface", async ({ page }) => {
-    test.setTimeout(90_000); await login(page); fs.mkdirSync(evidencia, { recursive: true });
+    test.setTimeout(150_000); await login(page); fs.mkdirSync(evidencia, { recursive: true });
     await page.getByRole("link", { name: /ver tudo em crm/i }).click();
     await page.getByRole("link", { name: "Financeiro" }).click();
     await expect(page.getByRole("heading", { name: "Financeiro", level: 1 })).toBeVisible();

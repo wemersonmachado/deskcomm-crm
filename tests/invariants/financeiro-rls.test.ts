@@ -27,6 +27,7 @@ beforeAll(() => {
 describe("financeiro — RLS e aprovação humana", () => {
   it("manager lê somente a própria organização; criação direta é fechada", () => {
     expect(Number(lastLine(como(manager, "select count(*) from finance_entries;")))).toBe(1);
+    expect(Number(lastLine(como(manager, `select count(*) from finance_entries where organization_id = '${orgB}';`)))).toBe(0);
     expect(() => como(manager, `insert into finance_entries (organization_id,direction,description,amount_cents,due_date,created_by_user_id)
       values ('${orgA}','payable','Despesa manual',1200,current_date,'${manager}');`)).toThrow();
   });
